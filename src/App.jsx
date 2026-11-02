@@ -1224,11 +1224,8 @@ export default function App() {
           onCommands={() => setCommandOpen(true)}
           onActivity={() => setActivityOpen(true)}
           onInstallUpdate={confirmInstallUpdate}
+          tabBar={tabs.length > 0 ? <TabBar tabs={tabs} activePath={repoPath} onSwitch={switchTab} onClose={closeTab} onNew={openRepo} busy={commandDisabled} /> : null}
         />
-
-        {tabs.length > 0 && (
-          <TabBar tabs={tabs} activePath={repoPath} onSwitch={switchTab} onClose={closeTab} onNew={openRepo} busy={commandDisabled} />
-        )}
 
         {!repo ? (
           <WelcomeScreen

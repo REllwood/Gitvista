@@ -2,6 +2,7 @@ import ModalOverlay from './ModalOverlay'
 import { useMemo, useState, useEffect } from 'react'
 import { computeGraph } from '../lib/graphLayout'
 import { buildPreview } from '../lib/preview'
+import { refRows } from '../lib/graphCommits'
 import { getActionMeta } from '../lib/actions'
 import { slugifyBranch } from '../lib/slug'
 import GraphSvg from './GraphSvg'
@@ -43,6 +44,9 @@ export default function ActionModal({ action, repo, busy, onConfirm, onCancel })
     [repo, action, value, toggleOn]
   )
   const graph = useMemo(() => (preview ? computeGraph(preview.commits.slice(0, 9)) : null), [preview])
+  // Where each branch label sits before the action, so a label that moves can
+  // glide from its old commit to its new one in the preview.
+  const refOrigins = useMemo(() => (graph ? refRows(graph.nodes, repo?.commits) : null), [graph, repo])
 
   useEffect(() => {
     const onKey = (e) => {
@@ -101,6 +105,7 @@ export default function ActionModal({ action, repo, busy, onConfirm, onCancel })
                 laneCount={graph.laneCount}
                 geom={MINI}
                 labelFor={(n) => (n.ghost ? '+ ' : '') + (n.subject || '').slice(0, 42)}
+                refOrigins={refOrigins}
               />
             </div>
           </div>

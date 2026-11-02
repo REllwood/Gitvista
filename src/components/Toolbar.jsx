@@ -12,7 +12,7 @@ function ToolButton({ icon, label, onClick, disabled, title, badge, primary = fa
 
 export default function Toolbar({ repo, prAvailable, onOpen, onClone, onRefresh, onFetch, onPull, onPush,
   onBranch, onStash, onUndo, onHistory, onCreatePR, onSettings, onHelp, onCommands,
-  onInstallUpdate, updateStatus, busy }) {
+  onInstallUpdate, updateStatus, busy, tabBar = null }) {
   const status = repo?.status || {}
   const hasRemote = !!repo?.remotes?.length
   const paused = !!repo?.conflict?.inProgress
@@ -21,7 +21,8 @@ export default function Toolbar({ repo, prAvailable, onOpen, onClone, onRefresh,
     <>
       <header className="toolbar">
         <div className="tb-logo"><span className="brand-mark"><Icon name="branch" size={16} /></span>GitVista</div>
-        <button className="command-launcher" onClick={onCommands} disabled={busy}>
+        {tabBar}
+        <button className={'command-launcher' + (tabBar ? ' compact' : '')} onClick={onCommands} disabled={busy}>
           <Icon name="search" size={13} /><span>Find a command or branch</span><kbd>{mod}K</kbd>
         </button>
         <div className="tb-right">

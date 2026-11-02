@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { computeGraph } from '../lib/graphLayout'
 import { previewCommit } from '../lib/preview'
+import { refRows } from '../lib/graphCommits'
 import GraphSvg from './GraphSvg'
 import Term from './Term'
 import Icon from './Icon'
@@ -245,7 +246,8 @@ export default function StagingPanel({
           <summary><Icon name="commit" size={13} />Preview your next commit</summary>
           <div className="sp-preview-graph">
             <GraphSvg nodes={preview.nodes} edges={preview.edges} laneCount={preview.laneCount} geom={MINI}
-              labelFor={(node) => (node.ghost ? '+ ' : '') + (node.subject || 'Your new commit').split('\n')[0].slice(0, 34)} />
+              labelFor={(node) => (node.ghost ? '+ ' : '') + (node.subject || 'Your new commit').split('\n')[0].slice(0, 34)}
+              refOrigins={refRows(preview.nodes, repo.commits)} />
           </div>
         </details>}
         <button className="primary-btn commit-btn" disabled={!canCommit} onClick={onCommit}>
