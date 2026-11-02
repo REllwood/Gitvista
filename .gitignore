@@ -1,0 +1,20 @@
+node_modules
+dist
+dist-electron
+out
+release
+.build
+coverage
+*.log
+.DS_Store
+.vite
+.env
+.env.*
+
+# Development notes and agent artefacts never ship
+CLAUDE.md
+.claude/
+.forge/
+.agents/
+.planning/
+docs/
