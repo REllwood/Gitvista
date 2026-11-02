@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
-    "simple-git": "^3.36.0"
+    "simple-git": "^4.0.2"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.5",
