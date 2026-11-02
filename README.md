@@ -244,7 +244,7 @@ The pieces are deliberately uniform. To add an action, touch these in order:
 Use the repeatable checks before treating a change as complete:
 
 1. **`npm run check`:** runs unit tests, real temporary-repository integration tests, Electron syntax checks and the production renderer build.
-2. **`npm audit --omit=dev --audit-level=high`:** checks production dependencies for high-severity vulnerabilities.
+2. **`npm audit --audit-level=high`:** checks every dependency for high-severity vulnerabilities. Electron is a dev dependency for electron-builder but ships inside the app, so a production-only audit would miss it.
 3. **Interaction pass:** run `npm run dev` and exercise both the welcome state and an active repository, including loading, error, empty and destructive-confirmation states. Check the developer console after the interaction.
 4. **Accessibility pass:** test keyboard-only navigation, visible focus, screen-reader names, contrast, reduced motion and the layout at narrow and enlarged-text sizes.
 5. **Packaging pass:** run `CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:dir`, launch the unpacked application and confirm `app.asar` contains `electron/`, `dist/index.html` and `node_modules/simple-git`.
@@ -290,7 +290,7 @@ Keep every credential in protected CI secrets. Do not place certificates, passwo
 
 1. Keep `repository.url` in `package.json` pointing at the real repository, `https://github.com/REllwood/gitvista.git`. `npm run check:release` blocks publishing if it is ever changed back to a placeholder.
 2. Configure protected signing and notarisation secrets for the release environment. Require manual environment approval for production releases.
-3. Run `npm run check`, the production dependency audit and `npm run check:release` before creating a version tag.
+3. Run `npm run check`, `npm audit --audit-level=high` and `npm run check:release` before creating a version tag.
 4. Create the version and tag manually according to the project's release policy. `.github/workflows/release.yml` then builds on macOS, Windows and Linux and publishes through GitHub Releases.
 5. Test the signed pre-release on clean machines, including first launch, clone/fetch/push credentials, update installation and rollback. Promote it only after those checks pass.
 6. Retain release notes, checksums and a previous signed installer. Auto-update metadata is published with the installers and `electron-updater` checks it from signed production builds.

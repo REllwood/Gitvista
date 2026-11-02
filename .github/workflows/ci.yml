@@ -41,5 +41,7 @@ jobs:
       - name: Validate release configuration
         run: npm run check:release
 
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      # Electron is a dev dependency for electron-builder but ships inside the
+      # app, so audit every dependency rather than production ones only.
+      - name: Audit dependencies, including the Electron runtime
+        run: npm audit --audit-level=high
