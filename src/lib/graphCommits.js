@@ -75,3 +75,14 @@ export function branchOwnCommits(nodes, tipHash, headHash) {
   }
   return own
 }
+
+// The row each ref sits on before an action, keyed by ref name, so a preview
+// can glide a moved branch label from its old commit to its new one.
+export function refRows(nodes, commits = []) {
+  const rows = new Map(nodes.map((node) => [node.hash, node.row]))
+  const origins = new Map()
+  for (const commit of commits) {
+    for (const ref of commit.refs || []) if (rows.has(commit.hash)) origins.set(ref.name, rows.get(commit.hash))
+  }
+  return origins
+}

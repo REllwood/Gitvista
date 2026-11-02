@@ -140,6 +140,12 @@ export default function CommitDetails({ repo, hash, commitOverride, onOpenDiff, 
         {loading ? <span role="status"><span className="spinner" aria-hidden="true" /> Loading changed files…</span> : `${info?.files?.length || 0} file${info?.files?.length === 1 ? '' : 's'} changed`}
       </div>
       <div className="cd-files">
+        {loading && !info?.files?.length && [62, 48, 36].map((width) => (
+          <div key={width} className="cd-file-skeleton" aria-hidden="true">
+            <span className="skeleton" style={{ width: `${width}%` }} />
+            <span className="skeleton" style={{ width: 38 }} />
+          </div>
+        ))}
         {loadError && (
           <div className="commit-files-error" role="alert">
             <span>{loadError}</span>

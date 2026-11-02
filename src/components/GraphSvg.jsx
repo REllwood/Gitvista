@@ -112,7 +112,7 @@ export default function GraphSvg({
             (freshHashes?.has(n.hash) ? ' fresh' : '')
           return (
             <g
-              key={n.hash}
+              key={n.ghost ? `ghost-row-${n.row}` : n.hash}
               className={className}
               onClick={onSelectNode ? () => onSelectNode(n.hash, n) : undefined}
               style={{
@@ -160,7 +160,7 @@ function PreviewLabel({ node, x, y, rowHeight, refOrigins, labelFor }) {
     <>
       {pills.map((ref) => {
         const text = ref.name.length > 18 ? `${ref.name.slice(0, 17)}…` : ref.name
-        const w = text.length * 6.4 + 14
+        const w = text.length * 5.7 + 14
         const origin = ref.ghost ? refOrigins?.get(ref.name) : undefined
         const shift = origin != null && origin !== node.row ? (origin - node.row) * rowHeight : 0
         const left = offset

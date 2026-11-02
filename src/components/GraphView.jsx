@@ -118,11 +118,14 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
       if (hasWip && !previous.wip) marked.hashes.add(WIP_HASH)
     }
     seen.current = { path: repo.path, hashes, wip: hasWip }
-    if (!marked.hashes.size) return undefined
-    setFresh(marked)
+    if (marked.hashes.size) setFresh(marked)
+  }, [repo.path, repo.commits, wipCount > 0])
+
+  useEffect(() => {
+    if (!fresh) return undefined
     const timer = setTimeout(() => setFresh(null), 1400)
     return () => clearTimeout(timer)
-  }, [repo.path, repo.commits, wipCount > 0])
+  }, [fresh])
 
   useEffect(() => {
     if (!landed) return undefined

@@ -1,4 +1,5 @@
 import Icon from './Icon'
+import WelcomePreview from './WelcomePreview'
 
 const basename = (path) => path.replace(/[/\\]+$/, '').split(/[/\\]/).filter(Boolean).pop() || path
 
@@ -22,6 +23,7 @@ export default function WelcomeScreen({ onOpen, onClone, onSandbox, hasApi, rece
           </button>
         </section>
         <section className="recent-repositories" aria-labelledby="recent-repositories-title">
+          <WelcomePreview />
           <div className="recent-repositories-head"><h2 id="recent-repositories-title">{recentRepos.length ? 'Recent repositories' : 'Getting started'}</h2><span>{recentRepos.length ? 'Reopen a project' : 'From folder to first commit'}</span></div>
           {recentRepos.length ? (
             <div className="recent-repositories-list">
