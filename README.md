@@ -1,15 +1,69 @@
 # GitVista
 
-GitVista is a desktop Git client in the style of GitKraken, built with Electron and React for people learning Git. Before any action runs, it draws a "ghost" preview of your history afterwards, explains the change in plain English and shows the real `git` command.
+[![CI](https://github.com/REllwood/gitvista/actions/workflows/ci.yml/badge.svg)](https://github.com/REllwood/gitvista/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/REllwood/gitvista?sort=semver)](https://github.com/REllwood/gitvista/releases/latest)
+[![License: MIT](https://img.shields.io/github/license/REllwood/gitvista)](LICENSE)
+![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-informational)
+
+GitVista is a desktop Git client for people learning Git. Before any action changes your history, it draws a preview of the result, explains the change in plain English and shows the real `git` command it will run.
+
+<img src=".github/assets/screenshot-graph-dark.png" alt="GitVista showing a commit graph with branches, a stash, uncommitted changes and a preview of the next commit" width="900">
+
+## See the result before you run it
+
+Merging, rebasing, resetting and every other action that changes history open a preview first. New commits appear as dashed "ghost" nodes, and a branch label that moves glides from its old commit to its new one.
+
+<img src=".github/assets/preview-merge.gif" alt="A merge preview: a ghost merge commit appears and the main branch label glides up onto it" width="524">
+
+## Features
+
+- **Previews for every history change:** merge, rebase, interactive rebase, cherry-pick, revert, reset, amend, branch, tag, stash, pull, push and force-push all show their result first.
+- **A readable commit graph:** branches in coloured lanes, uncommitted work on top of `HEAD`, each stash as a single node, and pills that show whether a branch matches its remote. Hover a branch to see the commits it adds.
+- **Staging and diffs:** stage whole files or single hunks, compare unified or side by side, and credit co-authors.
+- **Drag and drop:** drop one branch on another to merge or rebase, or drop a commit on your branch to cherry-pick it.
+- **Undo and recovery:** undo the last Git action, or restore any earlier point from the reflog.
+- **Guided conflicts:** choose your version or theirs per file, or edit by hand and mark the file resolved.
+- **GitHub:** pull requests, issues, reviews, CI status and protected merges, with your token kept in the system keychain.
+- **Everyday tools:** worktrees, file history and blame, history search, a command palette (`Cmd+K` or `Ctrl+K`), and light, dark and system themes.
+
+## Download
+
+Download the installer for your platform from the [latest release](https://github.com/REllwood/gitvista/releases/latest). GitVista uses the Git already installed on your computer, so install [Git](https://git-scm.com/downloads) first.
+
+| Platform | File |
+|---|---|
+| macOS, Apple silicon | `GitVista-<version>-mac-arm64.dmg` |
+| macOS, Intel | `GitVista-<version>-mac-x64.dmg` |
+| Windows | `GitVista-<version>-win-x64.exe` |
+| Linux | `.AppImage` for any distribution, or `.deb` for Debian and Ubuntu |
+
+Release builds are not yet signed with an Apple or Microsoft certificate, so your system asks for confirmation the first time you open GitVista:
+
+- **macOS:** drag GitVista to Applications and open it. When macOS says it cannot verify the developer, open **System Settings > Privacy & Security** and choose **Open Anyway**.
+- **Windows:** when SmartScreen shows "Windows protected your PC", choose **More info**, then **Run anyway**.
+- **Linux:** make the AppImage executable with `chmod +x GitVista-*.AppImage`, or install the package with `sudo apt install ./GitVista-*.deb`.
+
+Each release includes `SHA256SUMS.txt`. To check a download, run `shasum -a 256 -c SHA256SUMS.txt --ignore-missing` in the folder that holds it.
+
+## Screenshots
+
+<img src=".github/assets/screenshot-merge-preview.png" alt="The merge dialog with a preview graph, a plain-English explanation and the git merge command" width="900">
+
+<img src=".github/assets/screenshot-graph-light.png" alt="The light theme with a merge commit selected and its details open" width="900">
+
+<img src=".github/assets/screenshot-welcome.png" alt="The welcome screen with an example preview and getting-started steps" width="900">
+
+## Report a problem
+
+Open an [issue](https://github.com/REllwood/gitvista/issues/new/choose) for bugs and feature requests. Report security problems privately through [a security advisory](https://github.com/REllwood/gitvista/security/advisories/new).
 
 ---
 
-## 1. Who GitVista is for
+The rest of this file is the developer guide.
 
-GitVista is for people who are new to Git or nervous about it, and it still covers the daily work of experienced users.
+## 1. Product principle
 
-- **Beginners:** Git terms in the interface link to a plain-English glossary, every action explains itself before it runs, and a practice repository opens with one click.
-- **Everyone:** a visual commit graph, staging, branching, merging, rebasing, conflict resolution, cloning, pull requests and multiple repositories in tabs.
+GitVista is for people who are new to Git or nervous about it, and it still covers the daily work of experienced users. Git terms in the interface link to a plain-English glossary, and a practice repository opens with one click.
 
 The preview is GitVista's main feature. Every non-trivial action draws a small graph with dashed "ghost" nodes for the result, plus a plain-language note. New actions, especially risky ones, need a preview too.
 
@@ -147,7 +201,8 @@ src/
 tests/           Unit/static-contract tests plus integration tests against real temporary Git repositories
 build/           App icons (icon.svg + generated icon.icns/ico/png) and mac entitlements (buildResources)
 .github/workflows/ci.yml        Tests, build, release preflight and dependency audit on every pull request and push to main
-.github/workflows/release.yml   Cross-platform build + publish to GitHub Releases on a version tag
+.github/workflows/release.yml   Cross-platform build + publish to a draft GitHub Release on a version tag, then checksums
+.github/assets/                 README screenshots and the preview animation
 ```
 
 ### Conventions (follow these)
@@ -226,6 +281,8 @@ These commands are for local verification. Unless signing credentials are presen
 - **macOS:** provide a Developer ID Application certificate through `CSC_LINK` and `CSC_KEY_PASSWORD`. For notarisation, also provide `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID`. Hardened runtime and entitlements are configured in `package.json`.
 - **Windows:** provide an Authenticode certificate through `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD`. Public unsigned executables are likely to trigger trust warnings.
 - **Linux:** publish checksums alongside AppImage/deb artefacts and test each target distribution. Package signing is a separate distribution decision.
+
+Without these secrets the release workflow still builds and publishes. macOS apps are ad-hoc signed, Windows installers are unsigned, and the workflow run shows a warning for each unsigned platform. The download instructions at the top of this file tell people how to open an unsigned build. After the installers upload, a final job adds `SHA256SUMS.txt` to the release.
 
 Keep every credential in protected CI secrets. Do not place certificates, passwords, access tokens or Apple credentials in the repository or workflow file.
 

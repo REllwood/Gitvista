@@ -3855,6 +3855,15 @@ button:disabled { cursor: not-allowed; }
   0%, 40% { opacity: 0.8; }
   100% { opacity: 0; }
 }
+.graph-svg .node-label.ghost {
+  animation: fade-in 300ms var(--ease-out) 180ms both;
+}
+.graph-svg .node-label.making-room {
+  animation: make-room 320ms var(--ease-out-strong) 1150ms both;
+}
+@keyframes make-room {
+  from { transform: translateX(var(--room, 0px)); }
+}
 @keyframes pill-glide {
   from { transform: translateY(var(--glide-from, 0px)); }
 }

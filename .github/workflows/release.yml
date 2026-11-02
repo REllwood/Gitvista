@@ -1,9 +1,10 @@
 name: Release
 
-# Build installers for macOS, Windows and Linux and publish them to a GitHub
-# Release for a version tag or an explicitly dispatched run. Unsigned artefacts
-# are suitable for internal testing only; public releases should provide the
-# platform signing and notarisation secrets below.
+# Builds installers for macOS, Windows and Linux when a version tag is pushed,
+# or when the workflow is started by hand, and uploads them to a draft GitHub
+# Release. Each platform is signed when its signing secrets are configured.
+# Without them the build is unsigned (ad-hoc signed on macOS) and the run shows
+# a warning, so the release notes must tell people how to open it.
 
 on:
   push:
@@ -12,7 +13,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write # needed to create/upload the GitHub Release
+  contents: write # needed to create the GitHub Release and upload installers
 
 jobs:
   quality:
@@ -41,8 +42,26 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
-  release:
+  draft:
     needs: quality
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      # Create the draft first so the three platform builds upload into one
+      # release instead of racing to create their own.
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
+              --title "GitVista ${TAG#v}" --notes "Release notes are being prepared."
+          fi
+
+  release:
+    needs: [quality, draft]
+    if: ${{ !cancelled() && needs.quality.result == 'success' && needs.draft.result != 'failure' }}
     environment: production
     strategy:
       fail-fast: false
@@ -62,8 +81,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Require macOS signing and notarisation credentials
-        if: runner.os == 'macOS'
+      - name: Choose a signed or unsigned build
+        id: signing
         shell: bash
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -71,28 +90,61 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          test -n "$CSC_LINK" && test -n "$CSC_KEY_PASSWORD"
-          test -n "$APPLE_ID" && test -n "$APPLE_APP_SPECIFIC_PASSWORD" && test -n "$APPLE_TEAM_ID"
-
-      - name: Require Windows signing credentials
-        if: runner.os == 'Windows'
-        shell: bash
-        env:
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-        run: test -n "$WIN_CSC_LINK" && test -n "$WIN_CSC_KEY_PASSWORD"
+        run: |
+          signed=false
+          if [ "$RUNNER_OS" = "macOS" ] && [ -n "$CSC_LINK" ] && [ -n "$CSC_KEY_PASSWORD" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            signed=true
+          elif [ "$RUNNER_OS" = "Windows" ] && [ -n "$WIN_CSC_LINK" ] && [ -n "$WIN_CSC_KEY_PASSWORD" ]; then
+            signed=true
+          elif [ "$RUNNER_OS" = "Linux" ]; then
+            signed=true
+          fi
+          echo "signed=$signed" >> "$GITHUB_OUTPUT"
+          if [ "$signed" = "false" ]; then
+            echo "::warning title=Unsigned build::Signing secrets for $RUNNER_OS are not configured, so this build is unsigned."
+          fi
 
-      - name: Build & publish
+      - name: Build and publish a signed release
+        if: steps.signing.outputs.signed == 'true'
         run: npm run release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # ---- macOS signing + notarisation ----
-          CSC_LINK: ${{ secrets.CSC_LINK }} # base64 of your Developer ID .p12
+          CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # ---- Windows signing ----
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+
+      - name: Build and publish an unsigned release
+        if: steps.signing.outputs.signed != 'true'
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            npm run release -- -c.mac.identity=- -c.mac.notarize=false
+          else
+            npm run release
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+  checksums:
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upload SHA-256 checksums for every installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir installers && cd installers
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.dmg' --pattern '*.zip' --pattern '*.exe' --pattern '*.AppImage' --pattern '*.deb'
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          gh release upload "$TAG" SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber

@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest a Git workflow or improvement for GitVista.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the Git task and where GitVista gets in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help?
+      description: How should GitVista handle it? If the action changes history, describe what its preview should show.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: How do you do it today?
+      description: For example, the git command you run instead, or another tool you use.

@@ -1,0 +1,61 @@
+name: Bug report
+description: Something in GitVista does not work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for reporting a problem. Please do not include tokens, passwords or private repository contents.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe what you saw, including any error message.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a repository with ...
+        2. Right-click a commit and choose ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: GitVista version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple silicon)
+        - macOS (Intel)
+        - Windows
+        - Linux (AppImage)
+        - Linux (deb)
+    validations:
+      required: true
+  - type: input
+    id: git-version
+    attributes:
+      label: Git version
+      description: The output of `git --version`.
+      placeholder: git version 2.51.0
+  - type: textarea
+    id: logs
+    attributes:
+      label: Activity panel or console output
+      description: Open the Activity panel from the status bar and copy any failed operation.
+      render: text
