@@ -384,3 +384,38 @@ test('reflog dates describe the operation, not the old commit date', async () =>
   assert.ok(log[0].timestamp > Date.now() - 60000)
   assert.equal(log[0].selector, 'HEAD@{0}')
 })
+
+test('Git receives the hardened environment and no other inherited Git variables', async () => {
+  const repoPath = createRepo({ commit: true })
+  git(repoPath, ['branch', 'feature'])
+  const hooks = path.join(repoPath, '.git', 'hooks')
+  const envFile = path.join(repoPath, '.git', 'hook-env.txt')
+  git(repoPath, ['config', '--local', 'core.hooksPath', hooks])
+  fs.writeFileSync(path.join(hooks, 'post-checkout'), `#!/bin/sh\nenv > "${envFile}"\n`, { mode: 0o755 })
+  process.env.GIT_GITVISTA_PROBE = 'inherited'
+  try {
+    await gitService.checkout(repoPath, 'feature')
+  } finally {
+    delete process.env.GIT_GITVISTA_PROBE
+  }
+  const env = Object.fromEntries(
+    fs.readFileSync(envFile, 'utf8').split('\n').filter((line) => line.includes('='))
+      .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])
+  )
+  assert.equal(env.GIT_TERMINAL_PROMPT, '0')
+  assert.equal(env.GIT_EDITOR, 'true')
+  assert.equal(env.GIT_SEQUENCE_EDITOR, 'true')
+  assert.equal(env.GIT_LITERAL_PATHSPECS, '1')
+  assert.equal(env.GIT_OPTIONAL_LOCKS, '0')
+  assert.equal(env.GIT_SSH_COMMAND, process.env.GIT_SSH_COMMAND)
+  assert.equal(env.GIT_GITVISTA_PROBE, undefined)
+  assert.equal(env.HOME, process.env.HOME)
+})
+
+test('GitHub remotes resolve through the hardened Git factory', async () => {
+  const { resolveRepository } = require('../../electron/github.cjs')
+  const repoPath = createRepo({ commit: true })
+  git(repoPath, ['remote', 'add', 'upstream', 'https://example.com/other.git'])
+  git(repoPath, ['remote', 'add', 'origin', 'git@github.com:owner/project.git'])
+  assert.deepEqual(await resolveRepository(repoPath), { owner: 'owner', repo: 'project', remote: 'origin' })
+})

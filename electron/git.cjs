@@ -1,6 +1,6 @@
 // Git service: a thin, beginner-safe wrapper around the user's installed git,
 // driven through simple-git. Everything the renderer needs flows through here.
-const simpleGit = require('simple-git')
+const { simpleGit } = require('simple-git')
 const fs = require('fs')
 const fsp = require('fs/promises')
 const os = require('os')
@@ -31,8 +31,24 @@ const REC = '\x1e'
 const MAX_RENDERED_DIFF_BYTES = 5 * 1024 * 1024
 const DIFF_NOTICE_PREFIX = 'GITVISTA_DIFF_NOTICE\n'
 
+// simple-git strips inherited GIT_* variables before it runs git, so the
+// hardening above must be allowed through by name. Any other inherited Git
+// variable, such as a stray GIT_DIR or GIT_INDEX_FILE, is still removed.
+const ALLOWED_GIT_ENVIRONMENT = Object.freeze([
+  'GIT_TERMINAL_PROMPT',
+  'GIT_SSH_COMMAND',
+  'GIT_EDITOR',
+  'GIT_SEQUENCE_EDITOR',
+  'GIT_LITERAL_PATHSPECS',
+  'GIT_OPTIONAL_LOCKS',
+])
+
+function createGit(options = {}) {
+  return simpleGit({ binary: 'git', ...options, allowEnvironment: ALLOWED_GIT_ENVIRONMENT })
+}
+
 function g(repoPath) {
-  return simpleGit({ baseDir: repoPath, binary: 'git', maxConcurrentProcesses: 4 })
+  return createGit({ baseDir: repoPath, maxConcurrentProcesses: 4 })
 }
 
 async function getGitDirectory(repoPath) {
@@ -1168,7 +1184,7 @@ async function clone(parentDir, url, name) {
   } catch (error) {
     if (error?.code !== 'ENOENT') throw error
   }
-  await simpleGit({ baseDir: parent, maxConcurrentProcesses: 1 }).clone(url.trim(), target)
+  await createGit({ baseDir: parent, maxConcurrentProcesses: 1 }).clone(url.trim(), target)
   return dest
 }
 
@@ -1177,7 +1193,7 @@ async function clone(parentDir, url, name) {
 async function getGitConfig(scope = 'global', repoPath) {
   if (!['global', 'local'].includes(scope)) throw new Error('Configuration scope must be global or local.')
   if (scope === 'local' && !repoPath) throw new Error('A repository is required for local Git settings.')
-  const git = scope === 'local' && repoPath ? g(repoPath) : simpleGit()
+  const git = scope === 'local' && repoPath ? g(repoPath) : createGit()
   const scopeArgs = scope === 'local' ? ['--local'] : ['--global']
   const read = async (key, args) => {
     try {
@@ -1212,7 +1228,7 @@ async function setGitConfig(scope, key, value, repoPath) {
   if (key === 'gpg.format' && !['openpgp', 'ssh', 'x509', '', null].includes(value)) {
     throw new Error('That signing format is not supported.')
   }
-  const git = scope === 'local' && repoPath ? g(repoPath) : simpleGit()
+  const git = scope === 'local' && repoPath ? g(repoPath) : createGit()
   const scopeFlag = scope === 'local' ? '--local' : '--global'
   if (value === '' || value == null) {
     try {
@@ -1228,7 +1244,7 @@ async function setGitConfig(scope, key, value, repoPath) {
 
 // Effective identity in a repo (local overrides global) — used to guard commits.
 async function getIdentity(repoPath) {
-  const git = repoPath ? g(repoPath) : simpleGit()
+  const git = repoPath ? g(repoPath) : createGit()
   const read = async (key) => {
     try {
       return (await git.raw(['config', key])).trim()
@@ -1241,7 +1257,7 @@ async function getIdentity(repoPath) {
 
 async function gitVersion() {
   try {
-    return (await simpleGit().raw(['--version'])).trim()
+    return (await createGit().raw(['--version'])).trim()
   } catch {
     return ''
   }
@@ -1250,7 +1266,7 @@ async function gitVersion() {
 // ---- credentials -----------------------------------------------------------
 
 async function ensureCredentialHelper() {
-  const git = simpleGit()
+  const git = createGit()
   let helper = ''
   try {
     helper = (await git.raw(['config', '--global', 'credential.helper'])).trim()
@@ -1433,4 +1449,5 @@ module.exports = {
   storeCredential,
   createSandbox,
   resolveRepoFile,
+  createGit,
 }

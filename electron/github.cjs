@@ -1,5 +1,5 @@
 const { spawn } = require('child_process')
-const simpleGit = require('simple-git')
+const { createGit } = require('./git.cjs')
 
 const API_ROOT = 'https://api.github.com'
 const API_VERSION = '2026-03-10'
@@ -16,7 +16,7 @@ function parseGitHubRemote(value) {
 }
 
 async function resolveRepository(repoPath) {
-  const remotes = await simpleGit({ baseDir: repoPath, binary: 'git' }).getRemotes(true)
+  const remotes = await createGit({ baseDir: repoPath }).getRemotes(true)
   const ordered = [...remotes].sort((a, b) => (a.name === 'origin' ? -1 : b.name === 'origin' ? 1 : 0))
   for (const remote of ordered) {
     const parsed = parseGitHubRemote(remote.refs.fetch || remote.refs.push)
@@ -249,6 +249,7 @@ async function createReview(repoPath, pullNumber, event, body, commitId) {
 
 module.exports = {
   parseGitHubRemote,
+  resolveRepository,
   requestGitHub,
   listPullRequests,
   listIssues,

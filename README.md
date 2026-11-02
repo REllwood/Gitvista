@@ -154,6 +154,7 @@ build/           App icons (icon.svg + generated icon.icns/ico/png) and mac enti
 - **Previews** (`preview.js`): pure functions that clone the commit list and add flagged `ghost` nodes/refs — **no git is run**. `buildPreview(repo, action)` dispatches per action type and returns `{ commits, note }`. The same `computeGraph` renders it in the modals.
 - **Conflicts** (`git.cjs` `getConflictState`): detects `.git/MERGE_HEAD`, `rebase-merge`/`rebase-apply`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`. `continueOperation` uses prepared messages and non-interactive editor environment variables so Git never waits on an unavailable terminal.
 - **Credentials** (`git.cjs` top): sets `GIT_TERMINAL_PROMPT=0` and SSH batch mode so remote operations fail fast. Authentication comes from the OS credential helper or SSH agent; GitVista refuses plaintext token storage when no secure Linux helper is configured.
+- **Git environment allowlist** (`git.cjs` `createGit`): simple-git 4 removes every inherited `GIT_*` variable before it runs Git. The hardening variables are passed through by name in `ALLOWED_GIT_ENVIRONMENT`, so any new `GIT_*` setting must be added there or Git will never see it. Always create simple-git instances with `createGit`, never with `simpleGit` directly. An integration test reads the environment a Git hook receives to prove the allowlist works.
 - **IPC security** (`ipc-validation.cjs`): each of the 83 channels has an exact arity and type/path/ref schema. `main.cjs` also rejects calls not originating from the main application frame.
 
 ---
