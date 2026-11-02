@@ -270,7 +270,7 @@ export default function GitHubPanel({ repoPath, onClose, onCreate, onSettings, t
 
                   <section className="github-review-form">
                     <h4>Submit a review</h4>
-                    <textarea name="github-review-body" value={reviewBody} disabled={reviewBusy} onChange={(event) => setReviewBody(event.target.value)} placeholder="Write a concise review…" rows={3} />
+                    <textarea name="github-review-body" value={reviewBody} disabled={reviewBusy} onChange={(event) => setReviewBody(event.target.value)} placeholder="Write your review…" rows={3} />
                     <div>
                       <select name="github-review-event" value={reviewEvent} disabled={reviewBusy} onChange={(event) => setReviewEvent(event.target.value)}>
                         <option value="COMMENT">Comment</option>
@@ -289,7 +289,7 @@ export default function GitHubPanel({ repoPath, onClose, onCreate, onSettings, t
                     ) : (
                       <div className="github-merge-confirm">
                         <strong>Merge pull request #{detail.number}?</strong>
-                        <p>GitVista will require the head commit to remain at <code>{shortHash(detail.head.sha)}</code>, preventing a newly-pushed change from being merged without review.</p>
+                        <p>GitVista merges only while the head commit is still <code>{shortHash(detail.head.sha)}</code>. If someone pushes a new commit after your review, the merge is refused.</p>
                         <select name="github-merge-method" value={mergeMethod} disabled={mergeBusy} onChange={(event) => setMergeMethod(event.target.value)}>
                           <option value="squash">Squash and merge</option>
                           <option value="merge">Create a merge commit</option>

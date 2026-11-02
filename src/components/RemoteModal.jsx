@@ -27,7 +27,7 @@ export default function RemoteModal({ busy, existing = [], onAdd, onCancel }) {
         <label className="modal-field">
           <span>Name</span>
           <input className="modal-input" name="remote-name" value={name} placeholder="origin" onChange={(e) => setName(e.target.value)} disabled={busy} />
-          {taken && <span className="modal-slug">A remote named “{name.trim()}” already exists — pick another name.</span>}
+          {taken && <span className="modal-slug">A remote named “{name.trim()}” already exists. Pick another name.</span>}
         </label>
 
         <label className="modal-field">

@@ -60,7 +60,7 @@ export default function CommitDetails({ repo, hash, commitOverride, onOpenDiff, 
   const sameCommitter = c.email === a.email && c.name === a.name
   const parentDesc =
     commit.parents.length === 0
-      ? 'none — this is the very first commit'
+      ? 'none (this is the first commit)'
       : commit.parents.length >= 2
         ? `${commit.parents.length} (this is a merge)`
         : commit.parents.map((p) => shortHash(p)).join(', ')

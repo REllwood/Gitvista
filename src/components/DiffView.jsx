@@ -158,7 +158,7 @@ export default function DiffView({ diff, mode, view = 'unified', interactive, st
   const pairs = useMemo(() => (!isConflict && view === 'split' ? toPairs(rows) : null), [rows, view, isConflict])
 
   if (!diff || !diff.trim()) {
-    return <div className="diff-empty">No textual changes to show — the file may be binary, empty, or unchanged.</div>
+    return <div className="diff-empty">No text changes to show. The file may be binary, empty or unchanged.</div>
   }
 
   if (notice || binary) {

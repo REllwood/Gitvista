@@ -218,7 +218,7 @@ export default function App() {
       setBusy(false)
     }
     if (!target) {
-      toast('info', 'There’s nothing to undo yet.')
+      toast('info', 'There is nothing to undo yet.')
       return
     }
     if (target.kind === 'checkout') setAction({ type: 'checkout', ref: target.ref })
@@ -310,7 +310,7 @@ export default function App() {
     try {
       const path = await call(window.api.createSandbox())
       const opened = await openTab(path)
-      if (opened) toast('info', 'Opened your learning sandbox — experiment freely, nothing here can break real work.')
+      if (opened) toast('info', 'Opened the practice repository. It is a separate project, so changes here do not affect your own repositories.')
     } catch (error) {
       toast('error', error?.message || 'The learning sandbox could not be opened.')
     } finally {
@@ -470,7 +470,7 @@ export default function App() {
         }
       }
     } else if (/tell me who you are|empty ident|auto-detect email|user\.(name|email)|no name was given/i.test(err || '')) {
-      toast('error', 'Set your name & email in Settings before your first commit.')
+      toast('error', 'Set your name and email in Settings before your first commit.')
       setSettingsOpen(true)
     } else {
       toast('error', err || 'Could not commit.')
@@ -500,7 +500,7 @@ export default function App() {
       // Review remote changes before considering a destructive push.
       toast('error', 'Your push was rejected because the remote has newer commits. Fetch and review those changes before pushing again.')
     } else {
-      toast('error', errMsg || 'Something went wrong.')
+      toast('error', errMsg || 'Git could not complete that action.')
     }
   }
 
@@ -530,7 +530,7 @@ export default function App() {
         }
       }
     } else {
-      toast('error', err || 'Could not complete that.')
+      toast('error', err || 'Git could not finish that step.')
     }
   }
   const onResolve = (file, side) => fileOp(() => window.api.resolveUsing(repoPath, file, side))
@@ -662,7 +662,7 @@ export default function App() {
     setCompareState({ a: node.hash, b: 'HEAD', aLabel: shorth(node.hash), bLabel: repo?.currentBranch || 'HEAD' })
   const onSetCompareBase = (node) => {
     setCompareBase(node.hash)
-    toast('info', `Compare base set to ${shorth(node.hash)} — right-click another commit and choose “Compare with base”.`)
+    toast('info', `Compare base set to ${shorth(node.hash)} . Right-click another commit and choose “Compare with base”.`)
   }
   const onCompareWithBase = (node) =>
     setCompareState({ a: compareBase, b: node.hash, aLabel: shorth(compareBase), bLabel: shorth(node.hash) })
@@ -674,7 +674,7 @@ export default function App() {
     // user configure a whole rewrite that then fails at the last step.
     const dirty = (repo.status?.staged?.length || 0) + (repo.status?.unstaged?.length || 0) > 0
     if (dirty) {
-      toast('info', 'Commit or stash your current changes before rewriting history — a rebase needs a clean working tree.')
+      toast('info', 'Commit or stash your current changes before rewriting history. A rebase needs a clean working tree.')
       return
     }
     const byHash = new Map(repo.commits.map((c) => [c.hash, c]))
@@ -747,9 +747,9 @@ export default function App() {
       { divider: true },
       { label: 'Rewrite history from here…', icon: 'rebase', onClick: () => openInteractiveRebase(node) },
       { divider: true },
-      { label: `Reset ${cur} here — keep changes staged`, icon: 'reset', onClick: () => commitAction('reset-soft', node) },
-      { label: `Reset ${cur} here — keep changes in files`, icon: 'reset', onClick: () => commitAction('reset-mixed', node) },
-      { label: `Reset ${cur} here — discard changes`, icon: 'reset', danger: true, onClick: () => commitAction('reset-hard', node) },
+      { label: `Reset ${cur} here (keep changes staged)`, icon: 'reset', onClick: () => commitAction('reset-soft', node) },
+      { label: `Reset ${cur} here (keep changes in files)`, icon: 'reset', onClick: () => commitAction('reset-mixed', node) },
+      { label: `Reset ${cur} here (discard changes)`, icon: 'reset', danger: true, onClick: () => commitAction('reset-hard', node) },
       { divider: true },
       { label: 'Compare with current branch', icon: 'eye', onClick: () => onCompareWithHead(node) },
       { label: 'Set as compare base', icon: 'copy', onClick: () => onSetCompareBase(node) },
@@ -781,8 +781,8 @@ export default function App() {
           onClick: () => setCompareState({ a: source.hash, b: C, aLabel: shorth(source.hash), bLabel: shorth(C) }),
         })
       } else if (source.isCurrent) {
-        items.push({ label: `Move “${source.name}” here — keep changes`, icon: 'reset', onClick: () => setAction({ type: 'reset', mode: 'mixed', hash: C }) })
-        items.push({ label: `Move “${source.name}” here — discard changes`, icon: 'reset', danger: true, onClick: () => setAction({ type: 'reset', mode: 'hard', hash: C }) })
+        items.push({ label: `Move “${source.name}” here (keep changes)`, icon: 'reset', onClick: () => setAction({ type: 'reset', mode: 'mixed', hash: C }) })
+        items.push({ label: `Move “${source.name}” here (discard changes)`, icon: 'reset', danger: true, onClick: () => setAction({ type: 'reset', mode: 'hard', hash: C }) })
         items.push({ divider: true })
         items.push({ label: 'Create a branch here…', icon: 'branch', onClick: () => setAction({ type: 'branchAt', hash: C }) })
         items.push({ label: 'Tag this commit…', icon: 'tag', onClick: () => setAction({ type: 'tag', hash: C }) })
@@ -851,7 +851,7 @@ export default function App() {
   const onRemoveRemote = (name) =>
     setConfirm({
       title: `Remove remote “${name}”?`,
-      body: 'This only removes the link from this repository — the remote server and its data are untouched.',
+      body: 'This removes the link from this repository only. The remote server and its data do not change.',
       confirmLabel: 'Remove remote',
       onYes: () => {
         setConfirm(null)
@@ -1215,7 +1215,7 @@ export default function App() {
           onPull={() => setAction({ type: 'pull' })}
           onPush={() => setAction({ type: 'push' })}
           onBranch={() => setAction({ type: 'branch' })}
-          onStash={() => (dirtyCount > 0 ? setAction({ type: 'stash' }) : toast('info', 'Nothing to stash — your changes are all committed.'))}
+          onStash={() => (dirtyCount > 0 ? setAction({ type: 'stash' }) : toast('info', 'Nothing to stash. All your changes are committed.'))}
           onUndo={undoLast}
           onHistory={openHistory}
           onCreatePR={() => setGitHubOpen(true)}
@@ -1405,7 +1405,7 @@ export default function App() {
             <div className="modal" onClick={(e) => e.stopPropagation()}>
               <div className="modal-title">Start tracking this folder with Git?</div>
               <p className="modal-explain">
-                “{initPrompt}” isn't a Git repository yet. GitVista can set one up here so you can start saving
+                “{initPrompt}” is not a Git repository yet. GitVista can set one up here so you can start saving
                 snapshots of your work.
               </p>
               <div className="modal-command">

@@ -30,10 +30,10 @@ export default function PRModal({ repo, busy, onConfirm, onCancel }) {
             Pull requests open on GitHub, but this repository’s remote{' '}
             {origin ? (
               <>
-                is <code>{origin.url}</code>, which isn’t GitHub.
+                is <code>{origin.url}</code>, which is not GitHub.
               </>
             ) : (
-              "isn't set — there's no remote to open a PR against."
+              "is not set, so there is no remote to open a pull request against."
             )}
           </p>
           <div className="modal-actions">
@@ -84,11 +84,11 @@ export default function PRModal({ repo, busy, onConfirm, onCancel }) {
           <input className="modal-input" name="pull-request-title" value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} />
         </label>
 
-        {base === head && <p className="modal-note">Pick a different “Into” branch — you can’t merge a branch into itself.</p>}
+        {base === head && <p className="modal-note">Pick a different “Into” branch. A branch cannot be merged into itself.</p>}
 
         <p className="modal-note">
           {needsPush
-            ? 'Your branch has commits that aren’t on GitHub yet — we’ll push them first so the PR has something to show.'
+            ? 'Your branch has commits that are not on GitHub yet. GitVista will push them first so the pull request includes them.'
             : 'Your branch is already up to date on GitHub.'}
         </p>
 

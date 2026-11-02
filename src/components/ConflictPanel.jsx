@@ -10,7 +10,7 @@ export function ConflictBanner({ repo, onAbort, busy }) {
       <Icon name="alert" />
       <span>
         <strong>{c.inProgress ? `A ${c.inProgress} is paused.` : 'Conflicts need resolving.'}</strong> {n} file{n === 1 ? '' : 's'} need{n === 1 ? 's' : ''} your
-        attention — resolve {n === 1 ? 'it' : 'them'} in the panel on the right.
+        attention. Resolve {n === 1 ? 'it' : 'them'} in the panel on the right.
       </span>
       {c.inProgress && <button onClick={onAbort} disabled={busy}>Abort</button>}
     </div>
@@ -34,8 +34,8 @@ export default function ConflictPanel({ repo, busy, onResolve, onMarkResolved, o
           {files.length === 1 ? '' : 's'} to resolve
         </div>
         <p>
-          Git combined what it could, but couldn't decide on these files during the {op}. For each one, choose which
-          version to keep — or open it to edit by hand and then “Mark resolved” — then finish.
+          Git combined what it could, but could not decide how to combine these files during the {op}. For each file,
+          choose which version to keep, or edit it by hand and click “Mark resolved”. Then finish the {op}.
         </p>
       </div>
 
@@ -62,7 +62,7 @@ export default function ConflictPanel({ repo, busy, onResolve, onMarkResolved, o
                 className="cf-ghost"
                 disabled={busy}
                 onClick={() => onMarkResolved(f)}
-                title="I edited this file by hand — mark it resolved"
+                title="I edited this file by hand. Mark it resolved."
               >
                 Mark resolved
               </button>
@@ -71,7 +71,7 @@ export default function ConflictPanel({ repo, busy, onResolve, onMarkResolved, o
         ))}
         {done && (
           <div className="conflict-done">
-            <Icon name="check" /> All conflicts resolved — you're ready to finish.
+            <Icon name="check" /> All conflicts resolved. You can finish now.
           </div>
         )}
       </div>

@@ -2,7 +2,7 @@
   "name": "gitvista",
   "version": "0.1.0",
   "private": true,
-  "description": "GitVista — Visual Git for everyone. A beginner-friendly visual Git client with live history previews.",
+  "description": "A visual Git client that previews each action on your commit history before it runs.",
   "author": "GitVista",
   "license": "MIT",
   "type": "module",

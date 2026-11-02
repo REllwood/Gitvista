@@ -227,7 +227,7 @@ function createWindow() {
 function humanizeError(message) {
   const m = message || ''
   if (/could not read Username|terminal prompts disabled|Authentication failed|Invalid username or password|could not read Password/i.test(m)) {
-    return 'Authentication failed. GitVista uses your system Git credentials — open Settings to save a GitHub token, or set up an SSH key.'
+    return 'Authentication failed. GitVista uses your system Git credentials. Open Settings to save a GitHub token, or set up an SSH key.'
   }
   if (/Permission denied \(publickey\)|Host key verification failed/i.test(m)) {
     return 'The remote rejected your SSH key. Add your key to the SSH agent, or save a GitHub token in Settings to use HTTPS instead.'
@@ -236,13 +236,13 @@ function humanizeError(message) {
     return 'Git could not sign the commit. Check the signing format and key in Settings, or temporarily turn commit signing off.'
   }
   if (/Could not resolve host|unable to access|Failed to connect|Connection (timed out|refused)|network is unreachable/i.test(m)) {
-    return "Couldn't reach the remote. Check your internet connection and that the repository URL is correct."
+    return 'Could not reach the remote. Check your internet connection and that the repository URL is correct.'
   }
   if (/repository .* not found|remote: Repository not found/i.test(m)) {
-    return 'Repository not found. Double-check the URL, and that you have access to it.'
+    return 'Repository not found. Check the URL and that you have access to it.'
   }
   if (/stale info|force-with-lease|cannot lock ref|remote ref .* changed/i.test(m)) {
-    return 'The remote branch changed since you last fetched, so the safe force-push was declined to protect those new commits. Fetch and review what changed before trying again.'
+    return 'The remote branch changed since you last fetched, so Git declined the force-push to protect the new commits there. Fetch and review what changed before trying again.'
   }
   return m
 }

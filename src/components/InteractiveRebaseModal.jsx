@@ -8,11 +8,11 @@ import { shortHash } from '../lib/format'
 
 const MINI = { rowHeight: 24, laneWidth: 13, padX: 12, nodeR: 5 }
 const ACTIONS = [
-  { value: 'pick', label: 'Pick — keep as is' },
-  { value: 'reword', label: 'Reword — change message' },
-  { value: 'squash', label: 'Squash — merge into the one above (keep both messages)' },
-  { value: 'fixup', label: 'Fixup — merge into the one above (drop this message)' },
-  { value: 'drop', label: 'Drop — remove this commit' },
+  { value: 'pick', label: 'Pick: Keep as is' },
+  { value: 'reword', label: 'Reword: Change the message' },
+  { value: 'squash', label: 'Squash: Combine with the commit above and keep both messages' },
+  { value: 'fixup', label: 'Fixup: Combine with the commit above and drop this message' },
+  { value: 'drop', label: 'Drop: Remove this commit' },
 ]
 
 // The interactive-rebase editor. Rows are ordered oldest→newest (top→bottom, the
@@ -62,7 +62,7 @@ export default function InteractiveRebaseModal({ base, baseLabel, repo, commits,
         <p className="modal-explain">
           Reorder, squash, drop, or reword the commits from <code>{baseLabel}</code> up to now. Drag a row (or use the
           arrows) to reorder. The preview shows the result. These become brand-new commits (new ids), so avoid this on
-          work you've already shared.
+          work you have already shared.
         </p>
 
         <div className="irebase-list">
@@ -112,12 +112,12 @@ export default function InteractiveRebaseModal({ base, baseLabel, repo, commits,
 
         {invalidFirst && (
           <p className="modal-note">
-            The first kept commit can’t be “squash” or “fixup” — there’s nothing above it to combine into.
+            The first kept commit cannot be “squash” or “fixup” because there is no commit above it to combine with.
           </p>
         )}
 
         <div className="modal-preview">
-          <div className="modal-preview-label">Preview — your history after rewriting:</div>
+          <div className="modal-preview-label">Your history after rewriting:</div>
           <div className="modal-preview-graph">
             <GraphSvg
               nodes={graph.nodes}
