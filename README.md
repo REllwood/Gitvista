@@ -55,7 +55,9 @@ Each release includes `SHA256SUMS.txt`. To check a download, run `shasum -a 256 
 
 ## Report a problem
 
-Open an [issue](https://github.com/REllwood/gitvista/issues/new/choose) for bugs and feature requests. Report security problems privately through [a security advisory](https://github.com/REllwood/gitvista/security/advisories/new).
+Open an [issue](https://github.com/REllwood/gitvista/issues/new/choose) for bugs and feature requests. Report security problems privately, as the [security policy](SECURITY.md) describes.
+
+To contribute code, read the [contributing guide](CONTRIBUTING.md). Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
 
 ---
 
