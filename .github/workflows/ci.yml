@@ -1,0 +1,45 @@
+name: CI
+
+# Runs the full verification suite on every pull request into main and on
+# every push to main, so nothing merges without passing the tests, the
+# renderer build, the release preflight and the production dependency audit.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Test, build and audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test, syntax-check and build
+        run: npm run check
+
+      - name: Validate release configuration
+        run: npm run check:release
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
