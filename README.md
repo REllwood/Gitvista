@@ -68,7 +68,7 @@ npm run check      # tests + Electron syntax checks + production renderer build
 | Power-user controls | Command palette, keyboard shortcuts, light/dark/system themes, repository-specific identities, pull strategy and OpenPGP/SSH/X.509 commit signing | `CommandPalette.jsx`, `SettingsModal.jsx`, `App.jsx` |
 | Safety | Strict IPC schemas, trusted-sender checks, sandboxed renderer, navigation/permission policy, path containment, option-injection guards, OS keychain credentials, operation activity and render recovery | `ipc-validation.cjs`, `main.cjs`, `git.cjs`, `ErrorBoundary.jsx` |
 | Teaching | Plain-language everywhere, hover glossary, action previews + notes + real git command | `Term.jsx`, `HelpPanel.jsx`, `lib/glossary.js` |
-| Quality and packaging | Node test runner with real-repository integration tests, static security contracts, accessibility QA, electron-builder targets, release quality gate and auto-update states | `tests/`, `package.json`, `.github/workflows/release.yml` |
+| Quality and packaging | Node test runner with real-repository integration tests, static security contracts, accessibility QA, electron-builder targets, release quality gate and auto-update states | `tests/`, `package.json`, `.github/workflows/ci.yml`, `.github/workflows/release.yml` |
 
 ### Implemented with caveats
 
@@ -137,6 +137,7 @@ src/
                    WelcomeScreen, HelpPanel, ErrorBoundary, Avatar, Term, Toasts, Icon
 tests/           Unit/static-contract tests plus integration tests against real temporary Git repositories
 build/           App icons (icon.svg + generated icon.icns/ico/png) and mac entitlements (buildResources)
+.github/workflows/ci.yml        Tests, build, release preflight and dependency audit on every pull request and push to main
 .github/workflows/release.yml   Cross-platform build + publish to GitHub Releases on a version tag
 ```
 
