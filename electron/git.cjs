@@ -356,6 +356,15 @@ async function getCommitFiles(repoPath, hash) {
   }
 }
 
+// Quote a path the way Git writes it in a diff header (C-style), so names that
+// contain quotes, backslashes or control characters read back as the same path.
+const GIT_PATH_ESCAPES = { '"': '\\"', '\\': '\\\\', '\n': '\\n', '\t': '\\t', '\r': '\\r', '\b': '\\b', '\f': '\\f', '\v': '\\v', '\x07': '\\a' }
+function quoteGitPath(file) {
+  return file
+    .replace(/["\\\n\t\r\b\f\v\x07]/g, (character) => GIT_PATH_ESCAPES[character])
+    .replace(/[\x00-\x1f\x7f]/g, (character) => `\\${character.charCodeAt(0).toString(8).padStart(3, '0')}`)
+}
+
 async function getFileDiff(repoPath, file, staged) {
   const git = g(repoPath)
   const resolvedFile = resolveRepoFile(repoPath, file)
@@ -384,7 +393,7 @@ async function getFileDiff(repoPath, file, staged) {
       if (!content) return ''
       const hasFinalNewline = content.endsWith('\n')
       const lines = (hasFinalNewline ? content.slice(0, -1) : content).split('\n')
-      const quoted = file.replace(/"/g, '\\"')
+      const quoted = quoteGitPath(file)
       out = [
         `diff --git "a/${quoted}" "b/${quoted}"`,
         'new file mode 100644',
