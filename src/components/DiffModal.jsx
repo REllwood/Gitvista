@@ -23,7 +23,7 @@ export default function DiffModal({ state, onClose, onRetry, onStageHunk, onUnst
             {state.fileName}
             {state.kind === 'conflict' && <span className="diff-conflict-tag">conflict</span>}
             {state.interactive && view === 'unified' && (
-              <span className="diff-side-tag">{state.staged ? 'staged — click a hunk to unstage' : 'working — click a hunk to stage'}</span>
+              <span className="diff-side-tag">{state.staged ? 'Staged · click a hunk to unstage it' : 'Working · click a hunk to stage it'}</span>
             )}
           </span>
           <div className="diff-modal-tools">

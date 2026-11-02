@@ -579,7 +579,7 @@ async function defaultRemote(git) {
 async function push(repoPath) {
   const git = g(repoPath)
   const status = await git.status()
-  if (!status.current) throw new Error('Nothing to push — you are not on a branch.')
+  if (!status.current) throw new Error('Nothing to push because you are not on a branch.')
   if (!status.tracking) {
     // First push of a new branch: set the upstream so future pushes are simple.
     const remote = await defaultRemote(git)
@@ -597,7 +597,7 @@ async function push(repoPath) {
 async function forcePush(repoPath) {
   const git = g(repoPath)
   const status = await git.status()
-  if (!status.current) throw new Error('Nothing to push — you are not on a branch.')
+  if (!status.current) throw new Error('Nothing to push because you are not on a branch.')
   if (!status.tracking) {
     const remote = await defaultRemote(git)
     await git.push(['--force-with-lease', '-u', remote, status.current])
@@ -1327,7 +1327,7 @@ async function createSandbox(repoDir) {
     await git.commit(msg)
   }
 
-  write('README.md', '# My First Project\n\nWelcome to your Git learning sandbox.\nExperiment freely — nothing here can break your real work.\n')
+  write('README.md', '# My First Project\n\nWelcome to your Git practice repository.\nThis is a separate project, so changes here do not affect your other work.\n')
   await save('Add project README')
 
   write('app.js', "function main() {\n  console.log('Hello, Git!')\n}\n\nmain()\n")
@@ -1366,7 +1366,7 @@ async function createSandbox(repoDir) {
   // "Merge dark-mode into main" is a real two-parent merge, not a fast-forward
   // — which makes the merge preview much more instructive.
   await git.checkout('main')
-  write('README.md', '# My First Project\n\nWelcome to your Git learning sandbox.\nExperiment freely — nothing here can break your real work.\n\n## Usage\nRun the app and explore!\n')
+  write('README.md', '# My First Project\n\nWelcome to your Git practice repository.\nThis is a separate project, so changes here do not affect your other work.\n\n## Usage\nRun the app and explore.\n')
   await save('Document how to use the project')
 
   // Leave one uncommitted file so the staging panel has something to show the

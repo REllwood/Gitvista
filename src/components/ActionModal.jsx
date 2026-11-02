@@ -77,7 +77,7 @@ export default function ActionModal({ action, repo, busy, onConfirm, onCancel })
                     Will be used as <code>{finalValue}</code>
                   </>
                 ) : (
-                  'Use any words — we’ll format it into a valid branch name.'
+                  'Use any words. GitVista turns them into a valid branch name.'
                 )}
               </span>
             )}
@@ -93,7 +93,7 @@ export default function ActionModal({ action, repo, busy, onConfirm, onCancel })
 
         {graph && (
           <div className="modal-preview">
-            <div className="modal-preview-label">Preview — what your history will look like:</div>
+            <div className="modal-preview-label">What your history will look like:</div>
             <div className="modal-preview-graph">
               <GraphSvg
                 nodes={graph.nodes}

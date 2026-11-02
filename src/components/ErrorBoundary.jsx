@@ -23,10 +23,10 @@ export default class ErrorBoundary extends React.Component {
       return (
         <div className="crash">
           <div className="crash-card">
-            <div className="crash-title">Something went wrong displaying this view</div>
+            <div className="crash-title">This view could not be displayed</div>
             <p className="crash-body">
-              GitVista caught an error and stopped this screen from going blank. Your repository is untouched. Try
-              reloading; if it keeps happening, the details below help track it down.
+              GitVista hit an error while drawing this screen and stopped it here. Your repository has not changed.
+              Reload to try again.
             </p>
             {import.meta.env.DEV && (
               <pre className="crash-detail">{String(this.state.error?.stack || this.state.error?.message || this.state.error)}</pre>

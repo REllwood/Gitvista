@@ -11,17 +11,17 @@ export const GLOSSARY = {
   branch: {
     title: 'Branch',
     short: 'A separate line of work you can build on without affecting others.',
-    long: 'A branch is like a parallel copy of your project where you can try things out. The main branch usually holds the “real” version; you make new branches to work on features safely, then merge them back.',
+    long: 'A branch is like a parallel copy of your project where you can try things out. The main branch usually holds the “real” version. You make new branches to work on features without touching it, then merge them back.',
   },
   merge: {
     title: 'Merge',
     short: 'Combine the work from one branch into another.',
-    long: 'Merging takes the commits from another branch and weaves them into yours. If both branches changed the same lines, Git asks you to pick which version wins — that’s a “conflict”.',
+    long: 'Merging takes the commits from another branch and combines them with yours. If both branches changed the same lines, Git asks you to pick which version to keep. That is called a “conflict”.',
   },
   HEAD: {
     title: 'HEAD',
     short: 'A pointer to where “you are now” in the history.',
-    long: 'HEAD marks the commit your working files currently match. When you switch branches, HEAD moves. It’s highlighted in the graph so you always know your current position.',
+    long: 'HEAD marks the commit your working files currently match. When you switch branches, HEAD moves. It is highlighted in the graph so you can always see your current position.',
   },
   remote: {
     title: 'Remote',
@@ -31,7 +31,7 @@ export const GLOSSARY = {
   origin: {
     title: 'origin',
     short: 'The default name for your main remote (e.g. GitHub).',
-    long: '“origin” is just the nickname Git gives the remote you cloned from. Branches on it show up as “origin/main”, “origin/dev”, and so on.',
+    long: '“origin” is the nickname Git gives the remote you cloned from. Branches on it show up as “origin/main”, “origin/dev”, and so on.',
   },
   stage: {
     title: 'Stage',
@@ -41,12 +41,12 @@ export const GLOSSARY = {
   stash: {
     title: 'Stash',
     short: 'Temporarily set aside uncommitted changes.',
-    long: 'A stash safely tucks away changes you’re not ready to commit, giving you a clean slate. You can pop the stash later to get them back.',
+    long: 'A stash tucks away changes you are not ready to commit and leaves your working files clean. You can pop the stash later to get them back.',
   },
   push: {
     title: 'Push',
     short: 'Upload your commits to the remote.',
-    long: 'Pushing sends the commits you’ve made locally up to the shared remote so your teammates can see and use them.',
+    long: 'Pushing sends the commits you have made locally up to the shared remote so your teammates can see and use them.',
   },
   pull: {
     title: 'Pull',
@@ -56,7 +56,7 @@ export const GLOSSARY = {
   fetch: {
     title: 'Fetch',
     short: 'Download remote changes without merging them yet.',
-    long: 'Fetch quietly downloads what’s new on the remote so you can look before you leap. Unlike pull, it doesn’t change your own branches.',
+    long: 'Fetch downloads what is new on the remote so you can review it before merging. Unlike pull, it does not change your own branches.',
   },
   checkout: {
     title: 'Switch (checkout)',
@@ -66,17 +66,17 @@ export const GLOSSARY = {
   tag: {
     title: 'Tag',
     short: 'A friendly name pinned to a specific commit.',
-    long: 'Tags mark important commits — most often release versions like “v1.0”. Unlike branches, tags don’t move.',
+    long: 'Tags mark important commits, most often release versions like “v1.0”. Unlike branches, tags do not move.',
   },
   conflict: {
     title: 'Merge conflict',
     short: 'When two changes to the same lines must be reconciled by hand.',
-    long: 'If two branches edited the same part of a file differently, Git can’t guess which to keep, so it pauses and asks you to choose. Resolving means editing the file to the version you want, then committing.',
+    long: 'If two branches edited the same part of a file differently, Git cannot guess which to keep, so it pauses and asks you to choose. Resolving means editing the file to the version you want, then committing.',
   },
   fastforward: {
     title: 'Fast-forward',
-    short: 'A merge with nothing to combine — the label just slides forward.',
-    long: 'If your branch has no commits of its own since the other branch moved ahead, merging simply moves your branch label forward. No merge commit is created.',
+    short: 'A merge with nothing to combine, so the branch label moves forward.',
+    long: 'If your branch has no commits of its own since the other branch moved ahead, merging moves your branch label forward. No merge commit is created.',
   },
   repository: {
     title: 'Repository (repo)',

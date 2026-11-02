@@ -141,7 +141,7 @@ export default function Sidebar({
           </button>
         }
       >
-        {repo.remotes.length === 0 && <div className="side-empty">No remote yet — add one to push your work.</div>}
+        {repo.remotes.length === 0 && <div className="side-empty">No remote yet. Add one to push your work.</div>}
         {repo.remotes.map((r) => (
           <div key={r.name} className="side-item remote">
             <span className="si-dot remote-dot" />

@@ -23,8 +23,8 @@ export default function HistoryPanel({ entries, onRestore, onClose }) {
         </div>
         <div className="help-body">
           <p className="history-intro">
-            Every move of your current position (HEAD) is recorded here — your safety net. Restore to any earlier point
-            to undo a mistake. The newest is at the top.
+            Git records every move of your current position (HEAD) here. Restore any earlier point to undo a mistake.
+            The newest entry is at the top.
           </p>
           {entries.length === 0 && <div className="side-empty">No history recorded yet.</div>}
           {entries.map((e, i) => (

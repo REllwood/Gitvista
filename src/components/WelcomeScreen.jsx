@@ -7,9 +7,9 @@ export default function WelcomeScreen({ onOpen, onClone, onSandbox, hasApi, rece
     <main className="welcome">
       <div className="welcome-card">
         <section className="welcome-intro">
-          <span className="welcome-eyebrow"><span className="brand-mark"><Icon name="branch" size={20} /></span>Open source. At your command.</span>
-          <h1>Your history.<br /><span>A clearer view.</span></h1>
-          <p className="welcome-sub">Understand your branches, review every change, and see what happens before you act.</p>
+          <span className="welcome-eyebrow"><span className="brand-mark"><Icon name="branch" size={20} /></span>Open-source visual Git client</span>
+          <h1>See what Git will do<br /><span>before you run it.</span></h1>
+          <p className="welcome-sub">GitVista previews each action on your commit history, explains it in plain English and shows the git command it will run.</p>
           {!hasApi && <p className="welcome-warn"><Icon name="alert" />Open the GitVista desktop app to work with local repositories.</p>}
           <div className="welcome-actions">
             <button className="primary-btn big" onClick={onOpen} disabled={!hasApi || busy}><Icon name="folder" />Open repository</button>
@@ -17,12 +17,12 @@ export default function WelcomeScreen({ onOpen, onClone, onSandbox, hasApi, rece
           </div>
           <button className="sandbox-card" onClick={onSandbox} disabled={!hasApi || busy}>
             <Icon name="beaker" size={20} />
-            <span><strong>Get a feel for GitVista</strong><small>Explore branches and commits in a practice repository.</small></span>
+            <span><strong>Open the practice repository</strong><small>A separate demo project with branches and commits to experiment on.</small></span>
             {busy ? <span className="spinner" aria-label="Opening repository" /> : <span aria-hidden="true">→</span>}
           </button>
         </section>
         <section className="recent-repositories" aria-labelledby="recent-repositories-title">
-          <div className="recent-repositories-head"><h2 id="recent-repositories-title">Pick up where you left off</h2><span>{recentRepos.length ? 'Recent repositories' : 'Your workspace starts here'}</span></div>
+          <div className="recent-repositories-head"><h2 id="recent-repositories-title">{recentRepos.length ? 'Recent repositories' : 'Getting started'}</h2><span>{recentRepos.length ? 'Reopen a project' : 'From folder to first commit'}</span></div>
           {recentRepos.length ? (
             <div className="recent-repositories-list">
               {recentRepos.slice(0, 6).map((path) => (
@@ -38,13 +38,13 @@ export default function WelcomeScreen({ onOpen, onClone, onSandbox, hasApi, rece
             </div>
           ) : (
             <div className="welcome-steps">
-              <div><span>01</span><p><strong>Bring your project</strong>Open a folder or clone from your Git host.</p></div>
-              <div><span>02</span><p><strong>See the whole story</strong>Follow branches, people and changes in one place.</p></div>
-              <div><span>03</span><p><strong>Make your next move</strong>Review, stage and commit with a preview.</p></div>
+              <div><span>01</span><p><strong>Open or clone a repository</strong>Choose a local folder, or paste a URL from GitHub or another Git host.</p></div>
+              <div><span>02</span><p><strong>Read the history</strong>The graph shows every branch, who made each commit and what changed.</p></div>
+              <div><span>03</span><p><strong>Preview, then commit</strong>Stage your changes and see the new commit on the graph first.</p></div>
             </div>
           )}
         </section>
-        <div className="welcome-foot"><span>Local repositories. Your system Git. Your workflow.</span><span>Command palette <kbd>{/Mac/.test(navigator.platform) ? '⌘' : 'Ctrl+'}K</kbd></span></div>
+        <div className="welcome-foot"><span>Works on local repositories with the Git already installed on your computer.</span><span>Command palette <kbd>{/Mac/.test(navigator.platform) ? '⌘' : 'Ctrl+'}K</kbd></span></div>
       </div>
     </main>
   )

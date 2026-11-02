@@ -56,7 +56,7 @@ export function successMessage(a) {
     case 'forcePush':
       return 'Force-pushed your branch to the remote.'
     case 'stash':
-      return 'Your changes are safely stashed.'
+      return 'Your changes are stashed.'
     case 'stashPop':
       return 'Brought your stashed changes back.'
     case 'stashApply':
@@ -96,7 +96,7 @@ export function successMessage(a) {
     case 'reset':
       return 'Moved your branch.'
     case 'uncommit':
-      return 'Last commit undone — its changes are staged for you.'
+      return 'Last commit undone. Its changes are staged.'
     case 'restore':
       return 'Restored to the selected point in your history.'
     default:

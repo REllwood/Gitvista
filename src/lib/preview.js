@@ -101,7 +101,7 @@ export function previewCommit(repo, message) {
   commits.unshift(node)
 
   const note = headHash
-    ? `A new commit will be saved on “${label}”. Your branch label moves up to point at it — everything below stays exactly as it is.`
+    ? `A new commit will be saved on “${label}”. Your branch label moves up to point at it. Everything below stays as it is.`
     : `This will be the very first commit in the repository, starting the “${label}” branch.`
   return { commits, note }
 }
@@ -113,7 +113,7 @@ export function previewBranch(repo, name) {
   for (const c of commits) {
     if (c.hash === headHash) c.refs = [...c.refs, { name: clean, type: 'branch', ghost: true }]
   }
-  const note = `A new branch “${clean}” will be created pointing at your current commit. Nothing else changes yet — it's just a new label, so you can build new work without disturbing other branches.`
+  const note = `A new branch “${clean}” will point at your current commit. Nothing else changes yet. A branch is a label, so you can build new work without disturbing other branches.`
   return { commits, note }
 }
 
@@ -125,7 +125,7 @@ export function previewCheckout(repo, ref) {
   for (const c of commits) {
     if (c.hash === target) c.refs = [...c.refs, { name: label, type: 'head', ghost: true }]
   }
-  const note = `You'll switch to “${label}”. The history graph stays the same — only the highlighted HEAD marker (where “you are now”) moves, and your files change to match it.`
+  const note = `You will switch to “${label}”. The history graph stays the same. Only the highlighted HEAD marker (where “you are now”) moves, and your files change to match it.`
   return { commits, note }
 }
 
@@ -144,7 +144,7 @@ export function previewCherryPick(repo, hash) {
   commits.unshift(node)
   return {
     commits,
-    note: `A copy of this commit's changes will be added on top of “${label}”. The original commit is untouched — you'll have the same change in two places in history.`,
+    note: `A copy of this commit's changes will be added on top of “${label}”. The original commit stays where it is, so the same change appears in two places in history.`,
   }
 }
 
@@ -163,7 +163,7 @@ export function previewRevert(repo, hash) {
   commits.unshift(node)
   return {
     commits,
-    note: `A new commit will be added that undoes this commit's changes. Nothing is erased — both the original and the “undo” stay visible in history, so it's completely safe.`,
+    note: `A new commit will be added that undoes this commit's changes. Nothing is erased. Both the original and the “undo” stay visible in history.`,
   }
 }
 
@@ -175,7 +175,7 @@ export function previewTag(repo, hash, name) {
   }
   return {
     commits,
-    note: `A tag “${t}” will be pinned to this commit. Unlike a branch, a tag never moves — it's a permanent bookmark, perfect for marking releases.`,
+    note: `A tag “${t}” will be pinned to this commit. Unlike a branch, a tag never moves, which is why tags are used to mark releases.`,
   }
 }
 
@@ -188,7 +188,7 @@ export function previewBranchAt(repo, hash, name) {
   }
   return {
     commits,
-    note: `A new branch “${n}” will start at this commit and you'll switch onto it. Great for fixing something starting from an older point without disturbing other branches.`,
+    note: `A new branch “${n}” will start at this commit and you will switch onto it. Use this to fix something from an older point without disturbing other branches.`,
   }
 }
 
@@ -202,8 +202,8 @@ export function previewReset(repo, hash, mode) {
   }
   const extra =
     mode === 'hard'
-      ? ' Any commits after this point — and any uncommitted changes — will be discarded.'
-      : ' Commits after this point leave your branch; their changes come back to you as edits to re-commit.'
+      ? ' Commits after this point, and any uncommitted changes, will be discarded.'
+      : ' Commits after this point leave your branch. Their changes come back to you as edits to re-commit.'
   return {
     commits,
     note: `“${label}” will point at this commit instead of where it is now.${extra}`,
@@ -223,7 +223,7 @@ export function previewUncommit(repo) {
   }
   return {
     commits,
-    note: `Your branch label steps back one commit. The undone commit's changes return to your staging area, ready to commit again — nothing is lost.`,
+    note: `Your branch label steps back one commit. The undone commit's changes return to your staging area, ready to commit again. Nothing is lost.`,
   }
 }
 
@@ -239,7 +239,7 @@ export function previewAmend(repo, message) {
     commits,
     note: `Your last commit is replaced in place by a new one (new id) that folds in your staged changes${
       message && message.trim() ? ' and this message' : ''
-    }. Its position in history doesn't change — so don't amend a commit you've already shared.`,
+    }. Its position in history does not change, but its ID does, so do not amend a commit you have already shared.`,
   }
 }
 
@@ -256,7 +256,7 @@ export function previewRenameBranch(repo, oldName, newName) {
   }
   return {
     commits,
-    note: `The branch label “${oldName}” becomes “${n}”. The commits stay exactly where they are — only the name changes.`,
+    note: `The branch label “${oldName}” becomes “${n}”. The commits stay where they are. Only the name changes.`,
   }
 }
 
@@ -282,7 +282,7 @@ export function previewCheckoutRemote(repo, remoteBranch) {
   }
   return {
     commits,
-    note: `A new local branch “${local}” will be created to follow “${remoteBranch}”, and you'll switch onto it. From there you can commit and push back to the remote.`,
+    note: `A new local branch “${local}” will be created to follow “${remoteBranch}”, and you will switch onto it. From there you can commit and push back to the remote.`,
   }
 }
 
@@ -294,7 +294,7 @@ export function previewRestore(repo, hash) {
   if (!target) {
     return {
       commits,
-      note: `“${label}” will jump back to an earlier point (${(hash || '').slice(0, 7)}) from your history. That commit isn't shown in the current graph, but your files will be restored to exactly how they were then — anything after it is discarded.`,
+      note: `“${label}” will jump back to an earlier point (${(hash || '').slice(0, 7)}) from your history. That commit is not shown in the current graph, but your files will be restored to exactly how they were then. Anything after it is discarded.`,
     }
   }
   stripRefs(commits, (r) => r.type === 'head' || (r.type === 'branch' && r.name === label))
@@ -303,7 +303,7 @@ export function previewRestore(repo, hash) {
   }
   return {
     commits,
-    note: `“${label}” will move back to this commit and your files will match it. Commits after this point — and any uncommitted changes — are discarded.`,
+    note: `“${label}” will move back to this commit and your files will match it. Commits after this point, and any uncommitted changes, are discarded.`,
   }
 }
 
@@ -314,14 +314,14 @@ export function previewRebase(repo, onto) {
   if (!ontoHash || !headHash) return { commits, note: `Could not find “${onto}”.` }
 
   if (isAncestor(repo, ontoHash, headHash)) {
-    return { commits, note: `“${branch}” is already on top of “${onto}” — rebasing would do nothing.` }
+    return { commits, note: `“${branch}” is already on top of “${onto}”, so rebasing would change nothing.` }
   }
   if (isAncestor(repo, headHash, ontoHash)) {
     stripRefs(commits, (r) => r.type === 'head' || (r.type === 'branch' && r.name === branch))
     for (const c of commits) {
       if (c.hash === ontoHash) c.refs = [...c.refs, { name: branch, type: 'head', ghost: true }]
     }
-    return { commits, note: `“${branch}” has no commits of its own beyond “${onto}”, so it simply moves up to “${onto}”.` }
+    return { commits, note: `“${branch}” has no commits of its own beyond “${onto}”, so it moves up to “${onto}”.` }
   }
 
   const ontoSet = ancestorSet(repo, ontoHash)
@@ -340,7 +340,7 @@ export function previewRebase(repo, onto) {
   for (const node of ghosts) commits.unshift(node)
   return {
     commits,
-    note: `Your ${ordered.length} commit${ordered.length === 1 ? '' : 's'} on “${branch}” will be re-applied one by one on top of “${onto}”, making a clean straight line. The originals are replaced by fresh copies (new IDs), so avoid rebasing commits you've already shared.`,
+    note: `Your ${ordered.length} commit${ordered.length === 1 ? '' : 's'} on “${branch}” will be re-applied one by one on top of “${onto}”, so your history becomes a straight line. The originals are replaced by fresh copies (new IDs), so avoid rebasing commits you have already shared.`,
   }
 }
 
@@ -392,11 +392,11 @@ export function simulateRebaseTodo(repo, baseHash, items) {
 
   const note =
     ghosts.length === 0
-      ? 'Every commit is dropped — nothing would remain on this branch above the base.'
+      ? 'Every commit is dropped, so nothing would remain on this branch above the base.'
       : `Result: ${ghosts.length} commit${ghosts.length === 1 ? '' : 's'} replayed on top of the base` +
         `${squashed ? `, ${squashed} squashed/fixed up` : ''}${dropped ? `, ${dropped} dropped` : ''}${
           reworded ? `, ${reworded} reworded` : ''
-        }. These are brand-new commits (new ids), so avoid this on history you've already shared.`
+        }. These are brand-new commits (new IDs), so avoid this on history you have already shared.`
 
   return { commits: [...ghosts.reverse(), ...kept], note }
 }
@@ -411,7 +411,7 @@ export function previewMerge(repo, otherBranch) {
   if (isAncestor(repo, otherHash, headHash)) {
     return {
       commits,
-      note: `“${branch}” already contains everything in “${otherBranch}”. Nothing would change — they're already combined.`,
+      note: `“${branch}” already contains everything in “${otherBranch}”. Nothing would change because they are already combined.`,
     }
   }
 
@@ -423,7 +423,7 @@ export function previewMerge(repo, otherBranch) {
     }
     return {
       commits,
-      note: `“${branch}” can “fast-forward”: it has no new commits of its own, so its label simply slides forward to include “${otherBranch}”. No merge commit is needed.`,
+      note: `“${branch}” can “fast-forward”: it has no new commits of its own, so its label slides forward to include “${otherBranch}”. No merge commit is needed.`,
     }
   }
 
@@ -438,7 +438,7 @@ export function previewMerge(repo, otherBranch) {
   commits.unshift(node)
   return {
     commits,
-    note: `A merge commit will combine “${otherBranch}” into “${branch}”. Notice it has two lines flowing into it — that's what ties the two histories together. If the same lines were edited on both, Git will ask you to resolve a conflict.`,
+    note: `A merge commit will combine “${otherBranch}” into “${branch}”. It has two parents, drawn as two lines flowing into it, and that is how Git ties the two histories together. If the same lines were edited on both, Git will ask you to resolve a conflict.`,
   }
 }
 
@@ -447,26 +447,26 @@ export function previewMerge(repo, otherBranch) {
 export function previewFetch(repo) {
   return {
     commits: clone(repo.commits),
-    note: `Fetch downloads the latest commits from the remote (e.g. GitHub) and updates your “origin/…” markers. Your own branches do NOT move and your files are untouched — it just lets you see what's new before deciding to merge.`,
+    note: `Fetch downloads the latest commits from the remote (e.g. GitHub) and updates your “origin/…” markers. Your own branches do not move and your files stay as they are. You can see what is new before you decide to merge.`,
   }
 }
 
 export function previewPull(repo) {
   const behind = repo.status?.behind || 0
   const tail = behind
-    ? `The remote has ${behind} commit${behind === 1 ? '' : 's'} you don't have yet; pull will bring ${behind === 1 ? 'it' : 'them'} in.`
+    ? `The remote has ${behind} commit${behind === 1 ? '' : 's'} you do not have yet, and pull will bring ${behind === 1 ? 'it' : 'them'} in.`
     : `Right now you appear up to date, so this may do nothing.`
   return {
     commits: clone(repo.commits),
-    note: `Pull = fetch + merge in one step: it downloads new commits from the remote and combines them into your current branch. ${tail}`,
+    note: `Pull is a fetch and a merge in one step. It downloads new commits from the remote and combines them into your current branch. ${tail}`,
   }
 }
 
 export function previewPush(repo) {
   const ahead = repo.status?.ahead || 0
   const tail = ahead
-    ? `You have ${ahead} commit${ahead === 1 ? '' : 's'} that aren't on the remote yet; push will upload ${ahead === 1 ? 'it' : 'them'}.`
-    : `You don't appear to have local commits to upload right now.`
+    ? `You have ${ahead} commit${ahead === 1 ? '' : 's'} that are not on the remote yet, and push will upload ${ahead === 1 ? 'it' : 'them'}.`
+    : `You do not appear to have local commits to upload right now.`
   return {
     commits: clone(repo.commits),
     note: `Push uploads your local commits to the remote so teammates can see them. It does not change your local history. ${tail}`,
@@ -476,18 +476,18 @@ export function previewPush(repo) {
 export function previewStash(repo) {
   return {
     commits: clone(repo.commits),
-    note: `Stash tucks your uncommitted changes away safely and gives you a clean working directory. Your history is untouched — you can bring the changes back later with “Unstash”.`,
+    note: `Stash tucks your uncommitted changes away and gives you a clean working directory. Your history does not change, and you can bring the changes back later with “Unstash”.`,
   }
 }
 
 export function previewForcePush(repo) {
   const behind = repo.status?.behind || 0
   const tail = behind
-    ? `Right now the remote has ${behind} commit${behind === 1 ? '' : 's'} you don't have locally — a force-push will DELETE ${behind === 1 ? 'it' : 'them'} from the remote branch.`
+    ? `Right now the remote has ${behind} commit${behind === 1 ? '' : 's'} you do not have locally. A force-push will delete ${behind === 1 ? 'it' : 'them'} from the remote branch.`
     : `It overwrites the remote branch with exactly your local history.`
   return {
     commits: clone(repo.commits),
-    note: `Force-push replaces the remote branch with your local version. ${tail} Anyone who already pulled the old commits will be left with a broken history, so only do this on a branch that's yours. The safe “--force-with-lease” still refuses if the remote changed since your last fetch.`,
+    note: `Force-push replaces the remote branch with your local version. ${tail} Anyone who already pulled the old commits will be left with a broken history, so only do this on a branch that is yours. “--force-with-lease” still refuses if the remote changed since your last fetch.`,
   }
 }
 
