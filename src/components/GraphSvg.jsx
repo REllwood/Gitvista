@@ -8,6 +8,8 @@ import { edgePath, graphWidth } from '../lib/graphLayout'
 // branch label that moves glides from its old commit to its new one.
 const LABEL_W = 300
 const PILL_H = 16
+const pillText = (name) => (name.length > 18 ? `${name.slice(0, 17)}…` : name)
+const pillWidth = (name) => pillText(name).length * 5.7 + 14
 
 export default function GraphSvg({
   nodes,
@@ -35,6 +37,16 @@ export default function GraphSvg({
   const dashedRows = new Set(nodes.filter((n) => n.ghost || n.wip).map((n) => n.row))
   const ghostOrder = new Map(nodes.filter((n) => n.ghost).map((n, i) => [n.hash, i]))
   const selected = selectedHash ? nodes.find((n) => n.hash === selectedHash) : null
+  // Rows that a branch label leaves keep room for it while it glides away.
+  const departed = new Map()
+  if (refOrigins) {
+    for (const n of nodes) {
+      for (const ref of n.refs || []) {
+        const origin = ref.ghost ? refOrigins.get(ref.name) : undefined
+        if (origin != null && origin !== n.row) departed.set(origin, (departed.get(origin) || 0) + pillWidth(ref.name) + 6)
+      }
+    }
+  }
   const isFocused = (hash) => !focusHashes || focusHashes.has(hash)
 
   return (
@@ -141,7 +153,7 @@ export default function GraphSvg({
                   />
                 )}
               </g>
-              {hasLabels && <PreviewLabel node={n} x={labelX} y={cy} rowHeight={rowHeight} refOrigins={refOrigins} labelFor={labelFor} />}
+              {hasLabels && <PreviewLabel node={n} x={labelX} y={cy} rowHeight={rowHeight} refOrigins={refOrigins} labelFor={labelFor} room={departed.get(n.row) || 0} />}
             </g>
           )
         })}
@@ -153,14 +165,14 @@ export default function GraphSvg({
 // A preview row label: any branch pills that land on this commit, then the
 // commit subject. A pill that moved here from another commit starts at its old
 // row and glides into place.
-function PreviewLabel({ node, x, y, rowHeight, refOrigins, labelFor }) {
+function PreviewLabel({ node, x, y, rowHeight, refOrigins, labelFor, room }) {
   const pills = (node.refs || []).filter((ref) => ref.type === 'head' || ref.type === 'branch')
   let offset = x
   return (
     <>
       {pills.map((ref) => {
-        const text = ref.name.length > 18 ? `${ref.name.slice(0, 17)}…` : ref.name
-        const w = text.length * 5.7 + 14
+        const text = pillText(ref.name)
+        const w = pillWidth(ref.name)
         const origin = ref.ghost ? refOrigins?.get(ref.name) : undefined
         const shift = origin != null && origin !== node.row ? (origin - node.row) * rowHeight : 0
         const left = offset
@@ -175,7 +187,12 @@ function PreviewLabel({ node, x, y, rowHeight, refOrigins, labelFor }) {
           </g>
         )
       })}
-      <text x={offset} y={y + 4} className={node.ghost ? 'node-label ghost' : 'node-label'}>
+      <text
+        x={offset}
+        y={y + 4}
+        className={(node.ghost ? 'node-label ghost' : 'node-label') + (room ? ' making-room' : '')}
+        style={room ? { '--room': `${room}px` } : undefined}
+      >
         {labelFor(node)}
       </text>
     </>
