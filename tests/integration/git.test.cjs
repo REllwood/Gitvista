@@ -419,3 +419,14 @@ test('GitHub remotes resolve through the hardened Git factory', async () => {
   git(repoPath, ['remote', 'add', 'origin', 'git@github.com:owner/project.git'])
   assert.deepEqual(await resolveRepository(repoPath), { owner: 'owner', repo: 'project', remote: 'origin' })
 })
+
+test('an untracked file diff quotes awkward names exactly as Git does', { skip: process.platform === 'win32' }, async () => {
+  const repoPath = createRepo({ commit: true })
+  const name = 'back\\slash "quoted"\ttab.txt'
+  fs.writeFileSync(path.join(repoPath, name), 'first line\n')
+  const ours = (await gitService.getFileDiff(repoPath, name, false)).split('\n')[0]
+  git(repoPath, ['add', '--', name])
+  const theirs = git(repoPath, ['diff', '--cached', '--no-color', '--', name]).split('\n')[0]
+  assert.equal(ours, theirs)
+  assert.match(ours, /"a\/back\\\\slash \\"quoted\\"\\ttab\.txt"/)
+})
