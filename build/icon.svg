@@ -1,0 +1,29 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#232634"/>
+      <stop offset="1" stop-color="#14151d"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#45e7d0"/>
+      <stop offset="1" stop-color="#23c9b2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- rounded-square app tile -->
+  <rect x="0" y="0" width="1024" height="1024" rx="232" ry="232" fill="url(#bg)"/>
+  <rect x="3" y="3" width="1018" height="1018" rx="230" ry="230" fill="none" stroke="#000" stroke-opacity="0.25" stroke-width="6"/>
+
+  <!-- commit graph: a teal main lane with a blue branch that diverges and merges back -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="56">
+    <path d="M 372 256 L 372 768" stroke="url(#teal)"/>
+    <path d="M 372 420 C 372 552, 662 488, 662 606 C 662 728, 372 660, 372 768" stroke="#6ea8fe"/>
+  </g>
+
+  <!-- nodes -->
+  <circle cx="372" cy="256" r="80" fill="url(#teal)"/>
+  <circle cx="662" cy="606" r="72" fill="#6ea8fe"/>
+  <!-- merge node: teal ring with dark center, echoing the app's HEAD marker -->
+  <circle cx="372" cy="768" r="94" fill="#14151d" stroke="url(#teal)" stroke-width="38"/>
+  <circle cx="372" cy="768" r="32" fill="url(#teal)"/>
+</svg>
