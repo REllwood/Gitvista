@@ -4,6 +4,8 @@
 // The UI renders this side-by-side with the real graph so a beginner can see
 // what an action will do before committing to it.
 
+import { prepareGraphCommits } from './graphCommits.js'
+
 let ghostCounter = 0
 const ghostHash = () => `ghost-${++ghostCounter}`
 
@@ -13,6 +15,12 @@ function clone(commits) {
     parents: [...c.parents],
     refs: (c.refs || []).map((r) => ({ ...r })),
   }))
+}
+
+// The branch history a preview works on. Stashes are not part of any branch,
+// so they and their helper commits are left out of every preview.
+function history(repo) {
+  return clone(prepareGraphCommits(repo.commits || [], { stashes: repo.stashes, hideStashes: true }))
 }
 
 // Where HEAD currently is, and the branch it points to.
@@ -86,7 +94,7 @@ function youNode(extra) {
 }
 
 export function previewCommit(repo, message) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const { hash: headHash, branch } = findHead(repo)
   const label = branch || 'HEAD'
 
@@ -107,7 +115,7 @@ export function previewCommit(repo, message) {
 }
 
 export function previewBranch(repo, name) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const { hash: headHash } = findHead(repo)
   const clean = (name || '').trim() || 'new-branch'
   for (const c of commits) {
@@ -118,7 +126,7 @@ export function previewBranch(repo, name) {
 }
 
 export function previewCheckout(repo, ref) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const target = resolveTarget(repo, ref)
   const label = /^[0-9a-f]{40,}$/i.test(ref) ? ref.slice(0, 7) : ref
   stripRefs(commits, (r) => r.type === 'head')
@@ -130,7 +138,7 @@ export function previewCheckout(repo, ref) {
 }
 
 export function previewCherryPick(repo, hash) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const { hash: headHash, branch } = findHead(repo)
   const label = branch || 'HEAD'
   const src = repo.commits.find((c) => c.hash === hash)
@@ -149,7 +157,7 @@ export function previewCherryPick(repo, hash) {
 }
 
 export function previewRevert(repo, hash) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const { hash: headHash, branch } = findHead(repo)
   const label = branch || 'HEAD'
   const src = repo.commits.find((c) => c.hash === hash)
@@ -168,7 +176,7 @@ export function previewRevert(repo, hash) {
 }
 
 export function previewTag(repo, hash, name) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const t = (name || '').trim() || 'new-tag'
   for (const c of commits) {
     if (c.hash === hash) c.refs = [...c.refs, { name: t, type: 'tag', ghost: true }]
@@ -180,7 +188,7 @@ export function previewTag(repo, hash, name) {
 }
 
 export function previewBranchAt(repo, hash, name) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const n = (name || '').trim() || 'new-branch'
   stripRefs(commits, (r) => r.type === 'head')
   for (const c of commits) {
@@ -193,7 +201,7 @@ export function previewBranchAt(repo, hash, name) {
 }
 
 export function previewReset(repo, hash, mode) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const { branch } = findHead(repo)
   const label = branch || 'HEAD'
   stripRefs(commits, (r) => r.type === 'head' || (r.type === 'branch' && r.name === label))
@@ -211,7 +219,7 @@ export function previewReset(repo, hash, mode) {
 }
 
 export function previewUncommit(repo) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const { hash: headHash, branch } = findHead(repo)
   const head = repo.commits.find((c) => c.hash === headHash)
   const parent = head?.parents?.[0]
@@ -228,7 +236,7 @@ export function previewUncommit(repo) {
 }
 
 export function previewAmend(repo, message) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const { hash: headHash } = findHead(repo)
   const head = commits.find((c) => c.hash === headHash)
   if (!head) return { commits, note: 'There is no commit yet to amend.' }
@@ -244,7 +252,7 @@ export function previewAmend(repo, message) {
 }
 
 export function previewRenameBranch(repo, oldName, newName) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const n = (newName || '').trim() || 'new-name'
   for (const c of commits) {
     for (const r of c.refs) {
@@ -261,7 +269,7 @@ export function previewRenameBranch(repo, oldName, newName) {
 }
 
 export function previewMoveBranch(repo, name, hash) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   stripRefs(commits, (r) => r.type === 'branch' && r.name === name)
   for (const c of commits) {
     if (c.hash === hash) c.refs = [...c.refs, { name, type: 'branch', ghost: true }]
@@ -273,7 +281,7 @@ export function previewMoveBranch(repo, name, hash) {
 }
 
 export function previewCheckoutRemote(repo, remoteBranch) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const target = tipOf(repo, remoteBranch)
   const local = remoteBranch.replace(/^[^/]+\//, '')
   stripRefs(commits, (r) => r.type === 'head')
@@ -287,7 +295,7 @@ export function previewCheckoutRemote(repo, remoteBranch) {
 }
 
 export function previewRestore(repo, hash) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const { branch } = findHead(repo)
   const label = branch || 'HEAD'
   const target = commits.find((c) => c.hash === hash || c.hash.startsWith(hash || '\0'))
@@ -308,7 +316,7 @@ export function previewRestore(repo, hash) {
 }
 
 export function previewRebase(repo, onto) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const { hash: headHash, branch } = findHead(repo)
   const ontoHash = resolveTarget(repo, onto)
   if (!ontoHash || !headHash) return { commits, note: `Could not find “${onto}”.` }
@@ -348,7 +356,7 @@ export function previewRebase(repo, onto) {
 // on the graph: dropped commits vanish, squash/fixup fold into the commit above,
 // reword changes a subject, and reorders change the order — all as ghost nodes.
 export function simulateRebaseTodo(repo, baseHash, items) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const { branch } = findHead(repo)
   const label = branch || 'HEAD'
 
@@ -402,7 +410,7 @@ export function simulateRebaseTodo(repo, baseHash, items) {
 }
 
 export function previewMerge(repo, otherBranch) {
-  const commits = clone(repo.commits)
+  const commits = history(repo)
   const { hash: headHash, branch } = findHead(repo)
   const otherHash = tipOf(repo, otherBranch)
 
@@ -446,7 +454,7 @@ export function previewMerge(repo, otherBranch) {
 // precisely, so these return the unchanged graph plus a teaching note.
 export function previewFetch(repo) {
   return {
-    commits: clone(repo.commits),
+    commits: history(repo),
     note: `Fetch downloads the latest commits from the remote (e.g. GitHub) and updates your “origin/…” markers. Your own branches do not move and your files stay as they are. You can see what is new before you decide to merge.`,
   }
 }
@@ -457,7 +465,7 @@ export function previewPull(repo) {
     ? `The remote has ${behind} commit${behind === 1 ? '' : 's'} you do not have yet, and pull will bring ${behind === 1 ? 'it' : 'them'} in.`
     : `Right now you appear up to date, so this may do nothing.`
   return {
-    commits: clone(repo.commits),
+    commits: history(repo),
     note: `Pull is a fetch and a merge in one step. It downloads new commits from the remote and combines them into your current branch. ${tail}`,
   }
 }
@@ -468,14 +476,14 @@ export function previewPush(repo) {
     ? `You have ${ahead} commit${ahead === 1 ? '' : 's'} that are not on the remote yet, and push will upload ${ahead === 1 ? 'it' : 'them'}.`
     : `You do not appear to have local commits to upload right now.`
   return {
-    commits: clone(repo.commits),
+    commits: history(repo),
     note: `Push uploads your local commits to the remote so teammates can see them. It does not change your local history. ${tail}`,
   }
 }
 
 export function previewStash(repo) {
   return {
-    commits: clone(repo.commits),
+    commits: history(repo),
     note: `Stash tucks your uncommitted changes away and gives you a clean working directory. Your history does not change, and you can bring the changes back later with “Unstash”.`,
   }
 }
@@ -486,7 +494,7 @@ export function previewForcePush(repo) {
     ? `Right now the remote has ${behind} commit${behind === 1 ? '' : 's'} you do not have locally. A force-push will delete ${behind === 1 ? 'it' : 'them'} from the remote branch.`
     : `It overwrites the remote branch with exactly your local history.`
   return {
-    commits: clone(repo.commits),
+    commits: history(repo),
     note: `Force-push replaces the remote branch with your local version. ${tail} Anyone who already pulled the old commits will be left with a broken history, so only do this on a branch that is yours. “--force-with-lease” still refuses if the remote changed since your last fetch.`,
   }
 }
@@ -537,6 +545,6 @@ export function buildPreview(repo, action) {
     case 'stash':
       return previewStash(repo)
     default:
-      return { commits: clone(repo.commits), note: '' }
+      return { commits: history(repo), note: '' }
   }
 }

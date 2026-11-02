@@ -10,6 +10,7 @@ import { buildPreview } from '../../src/lib/preview.js'
 import { appendCoAuthors, normaliseCoAuthor } from '../../src/lib/commitMessage.js'
 import { normaliseRecentRepos, touchRecentRepo } from '../../src/lib/recentRepos.js'
 import { commandScore } from '../../src/lib/commandSearch.js'
+import { prepareGraphCommits, groupRefs, branchOwnCommits, WIP_HASH } from '../../src/lib/graphCommits.js'
 
 const repo = {
   currentBranch: 'main',
@@ -172,4 +173,69 @@ test('command search finds keyword and punctuation-separated matches', () => {
   assert.ok(commandScore(forcePush, 'overwrite remote') >= 0)
   assert.ok(commandScore(clone, 'download') >= 0)
   assert.equal(commandScore(clone, 'force push'), -1)
+})
+
+test('stash helper commits stay out of the graph and a stash keeps one parent', () => {
+  const commits = [
+    { hash: 'stash', parents: ['head', 'index', 'untracked'], subject: 'On main: draft', refs: [] },
+    { hash: 'index', parents: ['head'], subject: 'index on main: head', refs: [] },
+    { hash: 'untracked', parents: [], subject: 'untracked files on main: head', refs: [] },
+    { hash: 'head', parents: ['root'], subject: 'Polish', refs: [{ name: 'main', type: 'head' }] },
+    { hash: 'root', parents: [], subject: 'Start', refs: [] },
+  ]
+  const prepared = prepareGraphCommits(commits, { stashes: [{ index: 0, hash: 'stash', message: 'draft' }], head: 'head', wipCount: 2 })
+  assert.deepEqual(prepared.map((commit) => commit.hash), [WIP_HASH, 'stash', 'head', 'root'])
+  assert.deepEqual(prepared[1].parents, ['head'])
+  assert.equal(prepared[1].stash.index, 0)
+  assert.deepEqual(prepared[0].parents, ['head'])
+  assert.equal(prepared[0].wip.count, 2)
+  const graph = computeGraph(prepared)
+  assert.equal(graph.nodes.find((node) => node.hash === WIP_HASH).lane, graph.nodes.find((node) => node.hash === 'head').lane)
+  assert.deepEqual(prepareGraphCommits(commits.slice(3)).map((commit) => commit.hash), ['head', 'root'])
+})
+
+test('a pushed branch shows as one pill and the current branch leads', () => {
+  const pills = groupRefs([
+    { name: 'v1.0.0', type: 'tag' },
+    { name: 'origin/feature/search', type: 'remote' },
+    { name: 'feature/search', type: 'branch' },
+    { name: 'origin/main', type: 'remote' },
+    { name: 'main', type: 'head' },
+  ])
+  assert.deepEqual(pills.map((pill) => [pill.name, pill.type, pill.synced]), [
+    ['main', 'head', ['origin/main']],
+    ['feature/search', 'branch', ['origin/feature/search']],
+    ['v1.0.0', 'tag', []],
+  ])
+  assert.deepEqual(groupRefs([{ name: 'origin/other', type: 'remote' }]).map((pill) => pill.type), ['remote'])
+})
+
+test('a branch highlights only the commits it adds beyond the current branch', () => {
+  const nodes = [
+    { hash: 'f2', parents: ['f1'] },
+    { hash: 'm2', parents: ['m1'] },
+    { hash: 'f1', parents: ['m1'] },
+    { hash: 'm1', parents: ['root'] },
+    { hash: 'root', parents: [] },
+  ]
+  assert.deepEqual([...branchOwnCommits(nodes, 'f2', 'm2')], ['f2', 'f1'])
+  assert.deepEqual([...branchOwnCommits(nodes, 'm2', 'm2')], ['m2', 'm1', 'root'])
+})
+
+test('previews leave stashes out of the branch history', () => {
+  const stashRepo = {
+    head: 'head',
+    currentBranch: 'main',
+    stashes: [{ index: 0, hash: 'stash', message: 'draft' }],
+    status: { staged: [{ path: 'a.txt' }] },
+    commits: [
+      { hash: 'stash', parents: ['head', 'index'], subject: 'On main: draft', refs: [] },
+      { hash: 'index', parents: ['head'], subject: 'index on main: head', refs: [] },
+      { hash: 'head', parents: ['root'], subject: 'Polish', refs: [{ name: 'main', type: 'head' }] },
+      { hash: 'root', parents: [], subject: 'Start', refs: [] },
+    ],
+  }
+  const preview = buildPreview(stashRepo, { type: 'commit', message: 'Next' })
+  assert.deepEqual(preview.commits.slice(1).map((commit) => commit.hash), ['head', 'root'])
+  assert.equal(preview.commits[0].ghost, true)
 })

@@ -3474,6 +3474,373 @@ button:disabled { cursor: not-allowed; }
   height: 14px;
 }
 
+/* ---- motion and polish ----
+   Timings follow short interface durations (100 to 300 ms) and animate only
+   transform and opacity where possible. The reduced-motion block below turns
+   every animation into its end state. */
+:root {
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-pop: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --dur-1: 100ms;
+  --dur-2: 150ms;
+  --dur-3: 200ms;
+  --dur-4: 300ms;
+  --shadow-menu: 0 12px 32px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --pill-ink: #0b0d12;
+}
+:root[data-theme='light'] {
+  --shadow-menu: 0 12px 32px rgba(36, 48, 67, 0.16), 0 0 0 1px rgba(36, 48, 67, 0.06);
+}
+
+.cr-when,
+.rp-badge,
+.wip-count,
+.graph-heading h1 span,
+.activity-meta,
+.statusbar {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Buttons respond quickly and press in slightly. */
+.primary-btn,
+.ghost-btn,
+.danger-btn,
+.tb-btn,
+.icon-btn,
+.cm-item,
+.command-results button {
+  transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-2) var(--ease-out), transform var(--dur-1) var(--ease-out);
+}
+.primary-btn:active:not(:disabled),
+.ghost-btn:active:not(:disabled),
+.danger-btn:active:not(:disabled),
+.tb-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Overlays fade, dialogs rise and settle, menus grow from the pointer. */
+.modal-overlay,
+.command-overlay,
+.help-overlay {
+  animation: overlay-in var(--dur-2) var(--ease-out);
+}
+[data-modal-overlay] > [role='dialog'] {
+  animation: dialog-in var(--dur-3) var(--ease-out-strong);
+}
+.command-overlay > .command-palette {
+  animation: palette-in var(--dur-3) var(--ease-out-strong);
+}
+.help-panel {
+  animation: panel-in 240ms var(--ease-out-strong);
+}
+.context-menu {
+  transform-origin: top left;
+  box-shadow: var(--shadow-menu);
+  animation: menu-in var(--dur-2) var(--ease-out-strong);
+}
+@keyframes overlay-in {
+  from { opacity: 0; }
+}
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+}
+@keyframes palette-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+}
+@keyframes panel-in {
+  from { opacity: 0; transform: translateX(24px); }
+}
+@keyframes menu-in {
+  from { opacity: 0; transform: scale(0.96); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(4px); }
+}
+
+/* Toasts rise from the bottom, a success tick pops, and a thin bar counts
+   down until the toast closes. */
+.toast {
+  position: relative;
+  overflow: hidden;
+  animation: toast-in 400ms var(--ease-out-strong);
+}
+.toast::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: currentColor;
+  opacity: 0.25;
+  transform-origin: left;
+  animation: toast-timer 4s linear forwards;
+}
+.toast-error::after {
+  animation-duration: 7s;
+}
+.toast-success .icon {
+  animation: icon-pop 380ms var(--ease-pop) 80ms both;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+}
+@keyframes toast-timer {
+  to { transform: scaleX(0); }
+}
+@keyframes icon-pop {
+  from { opacity: 0; transform: scale(0.4); }
+}
+
+/* The right-hand tabs share a sliding underline, and the panel content fades
+   up when you switch tabs. */
+.rp-tab {
+  position: relative;
+  border-bottom-color: transparent;
+  transition: color var(--dur-2) var(--ease-out);
+}
+.rp-tab.active {
+  border-bottom-color: transparent;
+}
+.rp-tab::after {
+  content: '';
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transition: transform var(--dur-3) var(--ease-out-strong);
+}
+.rp-tab.active::after {
+  transform: scaleX(1);
+}
+.rp-body > * {
+  animation: fade-up var(--dur-3) var(--ease-out-strong);
+}
+
+/* Skeleton placeholders keep the layout steady while content loads. */
+.skeleton {
+  display: block;
+  height: 12px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--panel-2) 25%, var(--panel-3) 37%, var(--panel-2) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+@keyframes shimmer {
+  from { background-position: 100% 50%; }
+  to { background-position: 0 50%; }
+}
+
+/* ---- history graph ---- */
+.graph-scroll:focus-visible {
+  outline: none;
+}
+.graph-scroll:focus-visible .commit-row.selected {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 65%, transparent);
+}
+.commit-row {
+  border-left: none;
+  padding-left: 6px;
+  transition: background-color var(--dur-1) var(--ease-out), opacity var(--dur-2) var(--ease-out);
+}
+.commit-row:hover,
+.commit-row.hovered {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+.commit-row.selected {
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+}
+.commit-row.faded {
+  opacity: 0.35;
+}
+.commit-row.fresh {
+  animation: row-in 420ms var(--ease-out-strong) both;
+}
+.commit-row.landed {
+  animation: row-land 800ms var(--ease-out);
+}
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(-6px); }
+}
+@keyframes row-land {
+  0% { background-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  45% { background-color: color-mix(in srgb, var(--accent) 26%, transparent); }
+}
+
+.wip-row .cr-msg {
+  color: var(--text-dim);
+  font-style: italic;
+}
+.wip-row .wip-count {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+.wip-row .wip-hint {
+  flex-shrink: 0;
+  width: 232px;
+  padding-right: 4px;
+  color: var(--text-faint);
+  font-size: 12px;
+  text-align: right;
+}
+.stash-row .cr-msg {
+  color: var(--text-dim);
+}
+
+.graph-svg .edge {
+  stroke-width: 2px;
+  opacity: 0.78;
+  transition: opacity var(--dur-2) var(--ease-out), stroke-width var(--dur-2) var(--ease-out);
+}
+.graph-svg .edge.lit {
+  opacity: 1;
+  stroke-width: 2.5px;
+}
+.graph-svg .edge.faded,
+.graph-svg .graph-node.faded {
+  opacity: 0.22;
+}
+.graph-svg .graph-node {
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+.graph-svg .node-shape {
+  transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.graph-svg .graph-node.hovered .node-shape {
+  transform: scale(1.35);
+}
+.graph-svg .graph-node.fresh .node-shape {
+  animation: node-pop 460ms var(--ease-pop) both;
+}
+.graph-svg .edge.fresh,
+.graph-selection {
+  animation: fade-in 400ms var(--ease-out) both;
+}
+.graph-svg .wip-node {
+  animation: wip-breathe 2.4s ease-in-out infinite;
+}
+@keyframes node-pop {
+  from { opacity: 0; transform: scale(0.4); }
+}
+@keyframes wip-breathe {
+  50% { stroke-dashoffset: 3.3; }
+}
+
+/* Branch pills: an outline in the lane colour that fills on hover, a solid
+   pill for the current branch, and a cloud mark when the remote matches. */
+.ref-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 200px;
+  padding: 0 7px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--pill, var(--text-dim));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pill, var(--text-faint)) 55%, transparent);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 18px;
+  transition: background-color var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+}
+.ref-badge .icon {
+  opacity: 0.85;
+}
+.ref-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ref-synced {
+  display: inline-flex;
+  opacity: 0.75;
+}
+.ref-branch,
+.ref-remote {
+  --pill: var(--lane-color, var(--blue));
+}
+.ref-remote {
+  color: var(--text-dim);
+}
+.ref-branch:hover,
+.ref-remote:hover {
+  background: var(--pill);
+  color: var(--pill-ink);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+}
+.ref-head {
+  --pill: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: none;
+  font-weight: 600;
+}
+.ref-tag {
+  --pill: var(--warn);
+}
+.ref-detached {
+  --pill: var(--danger);
+}
+.ref-stash,
+.ref-more {
+  --pill: var(--text-faint);
+  color: var(--text-dim);
+}
+
+/* ---- preview graphs ----
+   Ghost commits pop in one after another and their edges draw themselves in.
+   A branch label that moves starts at its old commit and glides into place,
+   leaving a dotted outline where it was. */
+.graph-svg .graph-node.ghost-pop .node-shape {
+  animation: node-pop 380ms var(--ease-pop) both;
+  animation-delay: inherit;
+}
+.edge-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: edge-draw 380ms var(--ease-out) forwards;
+}
+@keyframes edge-draw {
+  to { stroke-dashoffset: 0; }
+}
+.preview-pill text {
+  fill: var(--pill-ink);
+  font-size: 10px;
+  font-weight: 600;
+}
+.preview-pill.ghost .preview-pill-body {
+  animation: fade-in 300ms var(--ease-out-strong) 160ms both;
+}
+.preview-pill.glide .preview-pill-body {
+  animation: pill-glide 560ms var(--ease-emphasized) 240ms both;
+}
+.preview-pill-origin {
+  fill: none;
+  stroke: var(--text-faint);
+  stroke-width: 1.2;
+  stroke-dasharray: 2 2;
+  opacity: 0.5;
+  animation: fade-in 300ms var(--ease-out) both;
+}
+@keyframes pill-glide {
+  from { transform: translateY(var(--glide-from, 0px)); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

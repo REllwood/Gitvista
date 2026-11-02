@@ -5,8 +5,11 @@ import Avatar from './Avatar'
 import Icon from './Icon'
 import { shortHash, relativeTime } from '../lib/format'
 import { changedFileCount } from '../lib/repositorySession'
+import { prepareGraphCommits, groupRefs, branchOwnCommits, WIP_HASH } from '../lib/graphCommits'
 
-const GEOM = { rowHeight: 42, laneWidth: 18, padX: 22, nodeR: 4 }
+const GEOM = { rowHeight: 36, laneWidth: 16, padX: 20, nodeR: 5 }
+const MAX_PILLS = 3
+const PILL_ICON = { head: 'branch', branch: 'branch', remote: 'cloud', tag: 'tag', detached: 'commit' }
 
 // The central history: an SVG graph on the left, perfectly aligned with HTML
 // rows on the right that show each commit's message, author and time. Commit
@@ -21,6 +24,11 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
   const [dragOver, setDragOver] = useState(null) // 'commit:<hash>' | 'branch:<name>'
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(600)
+  const [hoverHash, setHoverHash] = useState(null)
+  const [focusTip, setFocusTip] = useState(null)
+  const [landed, setLanded] = useState(null)
+  const [fresh, setFresh] = useState(null)
+  const seen = useRef({ path: null, hashes: new Set(), wip: false })
   const scrollRef = useRef(null)
   const setPayload = (e, data) => {
     try {
@@ -85,8 +93,42 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
     if (scrollRef.current) scrollRef.current.scrollTop = 0
   }, [q, searchMode])
 
-  const displayedCommits = q && searchMode !== 'visible' ? searchResults?.commits || [] : repo.commits
-  const { nodes, edges, laneCount } = useMemo(() => computeGraph(displayedCommits), [displayedCommits])
+  const status = repo.status || {}
+  const dirtyCount = changedFileCount(status)
+  const remoteSearch = q && searchMode !== 'visible'
+  const wipCount = q ? 0 : dirtyCount
+  const graphCommits = useMemo(
+    () => (remoteSearch ? searchResults?.commits || [] : prepareGraphCommits(repo.commits, { stashes: repo.stashes, head: repo.head, wipCount })),
+    [remoteSearch, searchResults, repo.commits, repo.stashes, repo.head, wipCount]
+  )
+  const { nodes, edges, laneCount } = useMemo(() => computeGraph(graphCommits), [graphCommits])
+  const focusHashes = useMemo(() => (focusTip ? branchOwnCommits(nodes, focusTip, repo.head) : null), [focusTip, nodes, repo.head])
+
+  // New commits after a refresh slide in, and the first rows of a newly opened
+  // repository arrive with a short stagger. Rows that mount while scrolling do
+  // not animate, because only these hashes are marked fresh.
+  useEffect(() => {
+    const hashes = new Set(repo.commits.map((commit) => commit.hash))
+    const previous = seen.current
+    const hasWip = wipCount > 0
+    let marked
+    if (previous.path !== repo.path) marked = { hashes: new Set(nodes.slice(0, 24).map((node) => node.hash)), intro: true }
+    else {
+      marked = { hashes: new Set([...hashes].filter((hash) => !previous.hashes.has(hash))), intro: false }
+      if (hasWip && !previous.wip) marked.hashes.add(WIP_HASH)
+    }
+    seen.current = { path: repo.path, hashes, wip: hasWip }
+    if (!marked.hashes.size) return undefined
+    setFresh(marked)
+    const timer = setTimeout(() => setFresh(null), 1400)
+    return () => clearTimeout(timer)
+  }, [repo.path, repo.commits, wipCount > 0])
+
+  useEffect(() => {
+    if (!landed) return undefined
+    const timer = setTimeout(() => setLanded(null), 900)
+    return () => clearTimeout(timer)
+  }, [landed])
   const gw = graphWidth(laneCount, GEOM)
   const matches = (n) =>
     !q ||
@@ -96,8 +138,6 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
     n.hash.toLowerCase().startsWith(q) ||
     (n.refs || []).some((ref) => ref.name.toLowerCase().includes(q))
   const matchCount = q ? (searchMode === 'visible' ? nodes.filter(matches).length : nodes.length) : 0
-  const status = repo.status || {}
-  const dirtyCount = changedFileCount(status)
   const totalHeight = nodes.length * GEOM.rowHeight
   const overscan = 18
   const firstVisible = Math.max(0, Math.floor(scrollTop / GEOM.rowHeight) - overscan)
@@ -107,7 +147,8 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
 
   function reveal(node, index, focus = false) {
     if (!node) return
-    onSelectCommit(node.hash, node)
+    if (node.wip) onSelectWip()
+    else onSelectCommit(node.hash, node)
     const element = scrollRef.current
     if (element) {
       const top = index * GEOM.rowHeight
@@ -123,10 +164,11 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
     const current = found.findIndex((node) => node.hash === selectedHash)
     const next = found[(current + direction + found.length) % found.length]
     reveal(next, next.row, true)
+    setLanded(next.hash)
   }
 
   function onHistoryKey(event) {
-    const current = nodes.findIndex((node) => node.hash === selectedHash)
+    const current = selected?.kind === 'wip' ? nodes.findIndex((node) => node.wip) : nodes.findIndex((node) => node.hash === selectedHash)
     const page = Math.max(1, Math.floor(viewportHeight / GEOM.rowHeight))
     const positions = { ArrowDown: current + 1, ArrowUp: current - 1, Home: 0, End: nodes.length - 1, PageDown: current + page, PageUp: current - page }
     if (event.key in positions) {
@@ -136,16 +178,17 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
     } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
       event.preventDefault()
       const rect = event.currentTarget.getBoundingClientRect()
-      if (nodes[current]) onContextCommit?.(nodes[current], rect.left + 60, rect.top + 30)
+      if (nodes[current] && !nodes[current].wip) onContextCommit?.(nodes[current], rect.left + 60, rect.top + 30)
     }
   }
 
   function jumpToHead() {
     setQuery('')
     setSearchMode('visible')
-    const index = repo.commits.findIndex((commit) => commit.hash === repo.head)
+    const index = prepareGraphCommits(repo.commits, { stashes: repo.stashes, head: repo.head, wipCount: dirtyCount }).findIndex((commit) => commit.hash === repo.head)
     if (index < 0) return
-    onSelectCommit(repo.head, repo.commits[index])
+    onSelectCommit(repo.head, repo.commits.find((commit) => commit.hash === repo.head))
+    setLanded(repo.head)
     requestAnimationFrame(() => {
       if (scrollRef.current) {
         scrollRef.current.scrollTop = Math.max(0, index * GEOM.rowHeight - 80)
@@ -210,22 +253,12 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
         <div className="graph-search-empty">No commits matched this search.</div>
       )}
       {q && searchResults?.truncated && <div className="graph-search-note">Showing the newest 200 matches.</div>}
-      {dirtyCount > 0 && (
-        <button className={'wip-bar' + (selected?.kind === 'wip' ? ' active' : '')} onClick={onSelectWip}>
-          <span className="wip-dot" />
-          <span className="wip-label">Uncommitted changes</span>
-          <span className="wip-count">
-            {dirtyCount} file{dirtyCount === 1 ? '' : 's'}
-          </span>
-          <span className="wip-hint">Click to review &amp; commit</span>
-        </button>
-      )}
       <div className="graph-header" style={{ paddingLeft: gw }}>
         <span className="gh-msg">Commit</span>
         <span className="gh-author">Author</span>
         <span className="gh-when">When</span>
       </div>
-      <div className="graph-scroll" ref={scrollRef} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} role="listbox" aria-label="Commit history" tabIndex={0} aria-activedescendant={visibleNodes.some((node) => node.hash === selectedHash) ? `commit-${selectedHash}` : undefined} onKeyDown={onHistoryKey}>
+      <div className="graph-scroll" ref={scrollRef} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} role="listbox" aria-label="Commit history" tabIndex={0} aria-activedescendant={selected?.kind === 'wip' && nodes[0]?.wip ? `commit-${WIP_HASH}` : visibleNodes.some((node) => node.hash === selectedHash) ? `commit-${selectedHash}` : undefined} onKeyDown={onHistoryKey}>
         <div className="graph-inner" style={{ height: totalHeight }}>
           <div className="graph-svg-wrap" style={{ width: gw }}>
             <GraphSvg
@@ -233,17 +266,49 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
               edges={edges}
               laneCount={laneCount}
               geom={GEOM}
-              selectedHash={selectedHash}
-              onSelectNode={onSelectCommit}
+              selectedHash={selected?.kind === 'wip' ? WIP_HASH : selectedHash}
+              onSelectNode={(hash, node) => (node.wip ? onSelectWip() : onSelectCommit(hash, node))}
+              hoverHash={hoverHash}
+              focusHashes={focusHashes}
+              freshHashes={fresh?.hashes}
             />
           </div>
           <div
             className="graph-rows"
             style={{ marginLeft: gw, position: 'absolute', top: firstVisible * GEOM.rowHeight, left: 0, right: 0 }}
           >
-            {visibleNodes.map((n) => {
+            {visibleNodes.map((n, index) => {
+              const freshStyle = fresh?.hashes.has(n.hash) ? { animationDelay: fresh.intro ? `${Math.min(firstVisible + index, 24) * 14}ms` : '0ms' } : null
+              const rowState =
+                (hoverHash === n.hash ? ' hovered' : '') +
+                (focusHashes && !focusHashes.has(n.hash) ? ' faded' : '') +
+                (freshStyle ? ' fresh' : '') +
+                (landed === n.hash ? ' landed' : '')
+              if (n.wip) {
+                const isSel = selected?.kind === 'wip'
+                return (
+                  <div
+                    key={n.hash}
+                    className={'commit-row wip-row' + (isSel ? ' selected' : '') + rowState}
+                    style={{ height: GEOM.rowHeight, ...freshStyle }}
+                    id={`commit-${n.hash}`}
+                    role="option"
+                    aria-selected={isSel}
+                    onClick={() => reveal(n, n.row, true)}
+                    onMouseEnter={() => setHoverHash(n.hash)}
+                    onMouseLeave={() => setHoverHash(null)}
+                  >
+                    <span className="cr-msg">Uncommitted changes</span>
+                    <span className="wip-count">{n.wip.count} file{n.wip.count === 1 ? '' : 's'}</span>
+                    <span className="wip-hint">Review and commit</span>
+                  </div>
+                )
+              }
               const isSel = selectedHash === n.hash
               const head = (n.refs || []).some((r) => r.type === 'head' || r.type === 'detached')
+              const pills = groupRefs(n.refs)
+              const shown = pills.slice(0, MAX_PILLS)
+              const hidden = pills.slice(MAX_PILLS)
               return (
                 <div
                   key={n.hash}
@@ -251,10 +316,12 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
                     'commit-row' +
                     (isSel ? ' selected' : '') +
                     (head ? ' is-head' : '') +
+                    (n.stash ? ' stash-row' : '') +
                     (q && searchMode === 'visible' && !matches(n) ? ' dim' : '') +
-                    (dragOver === 'commit:' + n.hash ? ' drop-hover' : '')
+                    (dragOver === 'commit:' + n.hash ? ' drop-hover' : '') +
+                    rowState
                   }
-                  style={{ height: GEOM.rowHeight }}
+                  style={{ height: GEOM.rowHeight, '--lane-color': n.color, ...freshStyle }}
                   id={`commit-${n.hash}`}
                   role="option"
                   aria-selected={isSel}
@@ -273,23 +340,34 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
                   }}
                   onDragEnd={() => setDragOver(null)}
                   onClick={() => reveal(n, n.row, true)}
+                  onMouseEnter={() => setHoverHash(n.hash)}
+                  onMouseLeave={() => setHoverHash(null)}
                   onContextMenu={(e) => {
                     e.preventDefault()
                     onContextCommit?.(n, e.clientX, e.clientY)
                   }}
                 >
                   <span className="cr-refs">
-                    {(n.refs || []).map((r, i) => {
+                    {n.stash && (
+                      <span className="ref-badge ref-stash" title="A stash: changes set aside to bring back later">
+                        <Icon name="stash" size={11} />stash
+                      </span>
+                    )}
+                    {shown.map((r) => {
                       const isBranchRef = r.type === 'branch' || r.type === 'head'
                       const target = { kind: 'branch', name: r.name, isCurrent: r.type === 'head' }
+                      const title = r.synced.length ? `${r.name} is in sync with ${r.synced.join(', ')}` : r.name
                       return (
                         <span
-                          key={i}
+                          key={r.type + r.name}
+                          title={title}
                           className={
                             `ref-badge ref-${r.type}` +
                             (isBranchRef ? ' ref-draggable' : '') +
                             (dragOver === 'branch:' + r.name ? ' drop-hover' : '')
                           }
+                          onMouseEnter={isBranchRef || r.type === 'remote' ? () => setFocusTip(n.hash) : undefined}
+                          onMouseLeave={isBranchRef || r.type === 'remote' ? () => setFocusTip(null) : undefined}
                           draggable={isBranchRef || undefined}
                           onDragStart={
                             isBranchRef
@@ -321,10 +399,17 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
                               : undefined
                           }
                         >
-                          {r.name}
+                          <Icon name={PILL_ICON[r.type] || 'branch'} size={11} />
+                          <span className="ref-name">{r.name}</span>
+                          {r.synced.length > 0 && <span className="ref-synced"><Icon name="cloud" size={11} /></span>}
                         </span>
                       )
                     })}
+                    {hidden.length > 0 && (
+                      <span className="ref-badge ref-more" title={hidden.map((r) => r.name).join(', ')}>
+                        +{hidden.length}
+                      </span>
+                    )}
                   </span>
                   <span className="cr-msg" title={n.subject}>{n.subject}</span>
                   <span className="cr-author">
