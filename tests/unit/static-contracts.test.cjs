@@ -40,15 +40,17 @@ test('auto-update only starts for a packaged application with release metadata',
 
 test('release preflight rejects placeholders and version-tag mismatches', () => {
   const valid = { repository: { url: 'https://github.com/gitvista-app/gitvista.git' }, version: '1.2.3' }
-  assert.equal(validateReleaseConfig(valid), 'https://github.com/gitvista-app/gitvista.git')
+  // Pass an explicit environment so a tag build's GITHUB_REF variables do not leak in.
+  assert.equal(validateReleaseConfig(valid, {}), 'https://github.com/gitvista-app/gitvista.git')
   assert.throws(
-    () => validateReleaseConfig({ ...valid, repository: { url: 'https://github.com/your-org/gitvista.git' } }),
+    () => validateReleaseConfig({ ...valid, repository: { url: 'https://github.com/your-org/gitvista.git' } }, {}),
     /placeholder/i
   )
   assert.throws(
     () => validateReleaseConfig(valid, { GITHUB_REF_TYPE: 'tag', GITHUB_REF_NAME: 'v1.2.4' }),
     /must match package version/i
   )
+  assert.equal(validateReleaseConfig(valid, { GITHUB_REF_TYPE: 'tag', GITHUB_REF_NAME: 'v1.2.3' }), 'https://github.com/gitvista-app/gitvista.git')
 })
 
 test('every CSS custom property either exists or has a fallback', () => {
