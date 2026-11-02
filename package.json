@@ -5,6 +5,7 @@
   "description": "A visual Git client that previews each action on your commit history before it runs.",
   "author": "GitVista",
   "license": "MIT",
+  "homepage": "https://github.com/REllwood/gitvista",
   "type": "module",
   "main": "electron/main.cjs",
   "engines": {
