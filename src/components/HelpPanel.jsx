@@ -27,7 +27,9 @@ export default function HelpPanel({ openTerm, onClose }) {
             return (
               <div
                 key={id}
-                ref={(el) => (refs.current[id] = el)}
+                ref={(el) => {
+                  refs.current[id] = el
+                }}
                 className={'help-item' + (openTerm === id ? ' hl' : '')}
               >
                 <div className="help-term">{d.title}</div>
