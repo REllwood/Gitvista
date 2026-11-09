@@ -1,5 +1,8 @@
 import ModalOverlay from './ModalOverlay'
 import { useEffect, useState } from 'react'
+import useMachine from '../hooks/useMachine'
+import useResource from '../hooks/useResource'
+import { operationMachine } from '../lib/machines'
 import Icon from './Icon'
 import Term from './Term'
 
@@ -16,10 +19,13 @@ export default function SettingsModal({ theme, onTheme, repoPath, onClose, onSav
   const [version, setVersion] = useState('')
   const [ghUser, setGhUser] = useState('')
   const [ghToken, setGhToken] = useState('')
-  const [savingId, setSavingId] = useState(false)
-  const [savingTok, setSavingTok] = useState(false)
-  const [openingToken, setOpeningToken] = useState(false)
-  const [loadingSettings, setLoadingSettings] = useState(true)
+  // One save at a time: the profile writes, the keychain write and opening the
+  // token page all go through the main process's single operation gate.
+  const [task, sendTask] = useMachine(operationMachine)
+  const modalBusy = task.value === 'running'
+  const savingId = task.context.kind === 'profile'
+  const savingTok = task.context.kind === 'token'
+  const openingToken = task.context.kind === 'token-page'
 
   useEffect(() => {
     let alive = true
@@ -35,43 +41,30 @@ export default function SettingsModal({ theme, onTheme, repoPath, onClose, onSav
     }
   }, [])
 
-  useEffect(() => {
-    let alive = true
-    const targetPath = scope === 'local' ? repoPath : null
-    setLoadingSettings(true)
-    ;(async () => {
-      try {
-        const c = await window.api.getConfig(scope, targetPath)
-        if (!alive) return
-        if (c?.ok) {
-          setName(String(c.data?.name || ''))
-          setEmail(String(c.data?.email || ''))
-          setPullMode(c.data?.pullRebase == null ? 'inherit' : c.data.pullRebase === true ? 'true' : 'false')
-          setSignMode(c.data?.signCommits == null ? 'inherit' : c.data.signCommits === true ? 'true' : 'false')
-          setSigningFormat(String(c.data?.signingFormat ?? (scope === 'local' ? '' : 'openpgp')))
-          setSigningKey(String(c.data?.signingKey || ''))
-        } else {
-          throw new Error(c?.error || 'Git settings could not be loaded.')
-        }
-      } catch (error) {
-        if (alive) toast('error', error?.message || 'Settings could not be loaded.')
-      } finally {
-        if (alive) setLoadingSettings(false)
-      }
-    })()
-    return () => {
-      alive = false
-    }
-  }, [scope, repoPath, toast])
+  // The profile for the chosen scope. Its fields can only be edited, and saved,
+  // once it has loaded, so a failed load can never save blank values over the
+  // real ones. Escape is answered by ModalOverlay, which refuses while busy.
+  const profile = useResource(async () => {
+    const result = await window.api.getConfig(scope, scope === 'local' ? repoPath : null)
+    if (!result?.ok) throw new Error(result?.error || 'Git settings could not be loaded.')
+    return result.data || {}
+  }, [scope, repoPath])
+  const profileEditable = profile.status === 'ready' && !modalBusy
 
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && !savingId && !savingTok && !openingToken && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, savingId, savingTok, openingToken])
+    if (profile.status !== 'ready') return
+    const c = profile.data
+    setName(String(c.name || ''))
+    setEmail(String(c.email || ''))
+    setPullMode(c.pullRebase == null ? 'inherit' : c.pullRebase === true ? 'true' : 'false')
+    setSignMode(c.signCommits == null ? 'inherit' : c.signCommits === true ? 'true' : 'false')
+    setSigningFormat(String(c.signingFormat ?? (scope === 'local' ? '' : 'openpgp')))
+    setSigningKey(String(c.signingKey || ''))
+    // The fields follow each newly loaded profile, not every scope change.
+  }, [profile.status, profile.data]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveIdentity() {
-    setSavingId(true)
+    if (!profileEditable || !sendTask({ type: 'START', kind: 'profile' })) return
     try {
       const targetPath = scope === 'local' ? repoPath : null
       const settings = [
@@ -93,7 +86,8 @@ export default function SettingsModal({ theme, onTheme, repoPath, onClose, onSav
     } catch (error) {
       toast('error', error?.message || 'Could not save settings.')
     } finally {
-      setSavingId(false)
+      sendTask({ type: 'FINISH' })
+      profile.reload()
     }
   }
 
@@ -102,7 +96,7 @@ export default function SettingsModal({ theme, onTheme, repoPath, onClose, onSav
       toast('error', 'Enter your GitHub username and a personal access token.')
       return
     }
-    setSavingTok(true)
+    if (!sendTask({ type: 'START', kind: 'token' })) return
     try {
       const r = await window.api.storeCredential({ host: 'github.com', username: ghUser.trim(), token: ghToken.trim() })
       if (!r?.ok) throw new Error(r?.error || 'Could not save the token.')
@@ -111,29 +105,27 @@ export default function SettingsModal({ theme, onTheme, repoPath, onClose, onSav
     } catch (error) {
       toast('error', error?.message || 'Could not save the token.')
     } finally {
-      setSavingTok(false)
+      sendTask({ type: 'FINISH' })
     }
   }
 
   async function openTokenPage() {
-    setOpeningToken(true)
+    if (!sendTask({ type: 'START', kind: 'token-page' })) return
     try {
       const result = await window.api.openExternal('https://github.com/settings/personal-access-tokens/new')
       if (!result?.ok) throw new Error(result?.error || 'The GitHub token page could not be opened.')
     } catch (error) {
       toast('error', error?.message || 'The GitHub token page could not be opened.')
     } finally {
-      setOpeningToken(false)
+      sendTask({ type: 'FINISH' })
     }
   }
-
-  const modalBusy = savingId || savingTok || openingToken
 
   return (
     <ModalOverlay className="modal-overlay" onClick={() => !modalBusy && onClose()}>
       <div className="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title" id="settings-title">Settings</div>
-        {loadingSettings && <div className="settings-loading" role="status"><span className="spinner" /> Loading settings…</div>}
+        {profile.status === 'loading' && <div className="settings-loading" role="status"><span className="spinner" /> Loading settings…</div>}
 
         <div className="settings-section">
           <div className="settings-head">Appearance</div>
@@ -160,7 +152,7 @@ export default function SettingsModal({ theme, onTheme, repoPath, onClose, onSav
               name="git-profile-scope"
               value={scope}
               onChange={(event) => setScope(event.target.value)}
-              disabled={savingId || loadingSettings}
+              disabled={modalBusy || profile.status === 'loading'}
             >
               <option value="global">All repositories (global)</option>
               <option value="local" disabled={!repoPath}>This repository only</option>
@@ -171,6 +163,13 @@ export default function SettingsModal({ theme, onTheme, repoPath, onClose, onSav
               </span>
             )}
           </label>
+          {profile.status === 'failed' && (
+            <div className="settings-load-error" role="alert">
+              <span>{profile.error}</span>
+              <button className="link-btn" onClick={() => profile.reload()}>Try again</button>
+            </div>
+          )}
+          <fieldset className="settings-fields" disabled={!profileEditable} data-state={profile.status}>
           <label className="modal-field">
             <span>Name</span>
             <input className="modal-input" name="git-author-name" autoComplete="name" value={name} placeholder="Ada Lovelace" onChange={(e) => setName(e.target.value)} />
@@ -235,8 +234,9 @@ export default function SettingsModal({ theme, onTheme, repoPath, onClose, onSav
               </label>
             </div>
           )}
+          </fieldset>
           <div className="settings-actions">
-            <button className="primary-btn" onClick={saveIdentity} disabled={savingId || loadingSettings}>
+            <button className="primary-btn" onClick={saveIdentity} disabled={!profileEditable}>
               {savingId ? <><span className="spinner" aria-hidden="true" /> Saving…</> : 'Save Git profile'}
             </button>
           </div>
@@ -250,13 +250,14 @@ export default function SettingsModal({ theme, onTheme, repoPath, onClose, onSav
           </p>
           <label className="modal-field">
             <span>GitHub username</span>
-            <input className="modal-input" name="github-username" autoComplete="username" value={ghUser} placeholder="your-username" onChange={(e) => setGhUser(e.target.value)} />
+            <input className="modal-input" name="github-username" autoComplete="username" disabled={modalBusy} value={ghUser} placeholder="your-username" onChange={(e) => setGhUser(e.target.value)} />
           </label>
           <label className="modal-field">
             <span>Personal access token</span>
             <input
               className="modal-input"
               name="github-token"
+              disabled={modalBusy}
               type="password"
               autoComplete="off"
               value={ghToken}
@@ -268,11 +269,11 @@ export default function SettingsModal({ theme, onTheme, repoPath, onClose, onSav
             <button
               className="ghost-btn"
               onClick={openTokenPage}
-              disabled={openingToken}
+              disabled={modalBusy}
             >
               {openingToken ? <><span className="spinner" aria-hidden="true" /> Opening…</> : 'Get a token'}
             </button>
-            <button className="primary-btn" onClick={saveToken} disabled={savingTok}>
+            <button className="primary-btn" onClick={saveToken} disabled={modalBusy}>
               {savingTok ? <><span className="spinner" aria-hidden="true" /> Saving…</> : 'Save token'}
             </button>
           </div>

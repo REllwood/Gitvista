@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
 import Avatar from './Avatar'
 import Term from './Term'
 import Icon from './Icon'
+import useResource from '../hooks/useResource'
 import { shortHash, fullDate, relativeTime } from '../lib/format'
 
 const SIGNATURES = {
@@ -19,37 +19,21 @@ const SIGNATURES = {
 // message, which files changed ("who pushed / what changed"), and quick
 // actions (branch here, tag, cherry-pick, revert).
 export default function CommitDetails({ repo, hash, commitOverride, onOpenDiff, onFileHistory, onCommitAction }) {
-  const [info, setInfo] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(null)
-  const [retry, setRetry] = useState(0)
   const commit = repo.commits.find((c) => c.hash === hash) || (commitOverride?.hash === hash ? commitOverride : null)
-
-  useEffect(() => {
-    let alive = true
-    setLoading(true)
-    setLoadError(null)
-    setInfo(null)
-    if (!hash) {
-      setLoading(false)
-      return undefined
-    }
-    window.api.getCommitFiles(repo.path, hash)
-      .then((res) => {
-        if (!alive) return
-        if (!res?.ok) throw new Error(res?.error || 'The changed files could not be loaded.')
-        setInfo(res.data || { files: [], body: '' })
-      })
-      .catch((error) => {
-        if (alive) setLoadError(error?.message || 'The changed files could not be loaded.')
-      })
-      .finally(() => {
-        if (alive) setLoading(false)
-      })
-    return () => {
-      alive = false
-    }
-  }, [repo.path, hash, retry])
+  // The loader tags its result with the commit it belongs to, so a newly
+  // selected commit never shows the previous commit's files, even for a frame.
+  const files = useResource(
+    async () => {
+      const res = await window.api.getCommitFiles(repo.path, hash)
+      if (!res?.ok) throw new Error(res?.error || 'The changed files could not be loaded.')
+      return { hash, ...(res.data || { files: [], body: '' }) }
+    },
+    [repo.path, hash],
+    { enabled: !!hash }
+  )
+  const info = files.data?.hash === hash ? files.data : null
+  const loadError = files.status === 'failed' ? files.error : null
+  const loading = !info && !loadError
 
   if (!commit) {
     return <div className="panel-empty">Select any commit in the graph to see who made it and what changed.</div>
@@ -137,9 +121,9 @@ export default function CommitDetails({ repo, hash, commitOverride, onOpenDiff, 
       {info?.body && info.body.trim() !== commit.subject.trim() && <pre className="cd-body">{info.body}</pre>}
 
       <div className="cd-files-head">
-        {loading ? <span role="status"><span className="spinner" aria-hidden="true" /> Loading changed files…</span> : `${info?.files?.length || 0} file${info?.files?.length === 1 ? '' : 's'} changed`}
+        {loading ? <span role="status"><span className="spinner" aria-hidden="true" /> Loading changed files…</span> : loadError ? 'Changed files' : `${info?.files?.length || 0} file${info?.files?.length === 1 ? '' : 's'} changed`}
       </div>
-      <div className="cd-files">
+      <div className="cd-files" data-state={files.status}>
         {loading && !info?.files?.length && [62, 48, 36].map((width) => (
           <div key={width} className="cd-file-skeleton" aria-hidden="true">
             <span className="skeleton" style={{ width: `${width}%` }} />
@@ -149,7 +133,7 @@ export default function CommitDetails({ repo, hash, commitOverride, onOpenDiff, 
         {loadError && (
           <div className="commit-files-error" role="alert">
             <span>{loadError}</span>
-            <button className="link-btn" onClick={() => setRetry((value) => value + 1)}>Try again</button>
+            <button className="link-btn" onClick={() => files.reload()}>Try again</button>
           </div>
         )}
         {info?.files?.map((f, i) => (

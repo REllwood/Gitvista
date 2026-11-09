@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { GLOSSARY, HELP_TOPICS } from '../lib/glossary'
 import Icon from './Icon'
+import ModalOverlay from './ModalOverlay'
 
 // Slide-in glossary. Opening it at a specific term scrolls that term into view
 // and highlights it.
@@ -13,8 +14,8 @@ export default function HelpPanel({ openTerm, onClose }) {
   }, [openTerm])
 
   return (
-    <div className="help-overlay" onClick={onClose}>
-      <aside className="help-panel" onClick={(e) => e.stopPropagation()}>
+    <ModalOverlay className="help-overlay" onClick={onClose}>
+      <aside className="help-panel" aria-label="Git, in plain English" onClick={(e) => e.stopPropagation()}>
         <div className="help-head">
           <span>Git, in plain English</span>
           <button className="icon-btn" onClick={onClose} aria-label="Close help">
@@ -40,6 +41,6 @@ export default function HelpPanel({ openTerm, onClose }) {
           })}
         </div>
       </aside>
-    </div>
+    </ModalOverlay>
   )
 }

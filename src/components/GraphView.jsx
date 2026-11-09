@@ -5,6 +5,7 @@ import Avatar from './Avatar'
 import Icon from './Icon'
 import { shortHash, relativeTime } from '../lib/format'
 import { changedFileCount } from '../lib/repositorySession'
+import useResource from '../hooks/useResource'
 import { prepareGraphCommits, groupRefs, branchOwnCommits, WIP_HASH } from '../lib/graphCommits'
 
 const GEOM = { rowHeight: 36, laneWidth: 16, padX: 20, nodeR: 5 }
@@ -18,9 +19,6 @@ const PILL_ICON = { head: 'branch', branch: 'branch', remote: 'cloud', tag: 'tag
 export default function GraphView({ repo, selected, onSelectCommit, onSelectWip, onContextCommit, onDropGesture }) {
   const [query, setQuery] = useState('')
   const [searchMode, setSearchMode] = useState('visible')
-  const [searchResults, setSearchResults] = useState(null)
-  const [searchLoading, setSearchLoading] = useState(false)
-  const [searchError, setSearchError] = useState(null)
   const [dragOver, setDragOver] = useState(null) // 'commit:<hash>' | 'branch:<name>'
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(600)
@@ -46,37 +44,25 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
     }
   }
   const q = query.trim().toLowerCase()
-  useEffect(() => {
-    let alive = true
-    let timer = null
-    if (!q || searchMode === 'visible') {
-      setSearchResults(null)
-      setSearchLoading(false)
-      setSearchError(null)
-      return undefined
-    }
-    setSearchLoading(true)
-    setSearchError(null)
-    setSearchResults(null)
-    timer = setTimeout(() => {
-      window.api.searchHistory(repo.path, query.trim(), searchMode)
-        .then((result) => {
-          if (!alive) return
-          if (result?.ok) setSearchResults(result.data)
-          else setSearchError(result?.error || 'History search failed.')
-        })
-        .catch((error) => {
-          if (alive) setSearchError(error?.message || 'History search failed.')
-        })
-        .finally(() => {
-          if (alive) setSearchLoading(false)
-        })
-    }, 280)
-    return () => {
-      alive = false
-      if (timer) clearTimeout(timer)
-    }
-  }, [q, query, searchMode, repo.path])
+  // Searching all history or code changes asks Git, after a short pause in
+  // typing. Each keystroke starts a newer request, and a superseded one stops
+  // before it reaches Git.
+  const remoteSearch = !!q && searchMode !== 'visible'
+  const search = useResource(
+    async ({ isLatest }) => {
+      await new Promise((resolve) => setTimeout(resolve, 280))
+      if (!isLatest()) return null
+      const result = await window.api.searchHistory(repo.path, query.trim(), searchMode)
+      if (!result?.ok) throw new Error(result?.error || 'History search failed.')
+      return result.data
+    },
+    [q, searchMode, repo.path],
+    { enabled: remoteSearch }
+  )
+  const searchStatus = remoteSearch ? search.status : 'off'
+  const searchResults = searchStatus === 'ready' ? search.data : null
+  const searchLoading = searchStatus === 'loading' || searchStatus === 'idle'
+  const searchError = searchStatus === 'failed' ? search.error : null
 
   useEffect(() => {
     const element = scrollRef.current
@@ -95,7 +81,6 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
 
   const status = repo.status || {}
   const dirtyCount = changedFileCount(status)
-  const remoteSearch = q && searchMode !== 'visible'
   const wipCount = q ? 0 : dirtyCount
   const graphCommits = useMemo(
     () => (remoteSearch ? searchResults?.commits || [] : prepareGraphCommits(repo.commits, { stashes: repo.stashes, head: repo.head, wipCount })),
@@ -220,7 +205,7 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
   }
 
   return (
-    <div className="graph-view">
+    <div className="graph-view" data-search={searchStatus}>
       <div className="graph-heading"><h1>Commit history <span>{repo.commits.length}{repo.commits.length >= 800 ? '+' : ''}</span></h1><button onClick={jumpToHead} disabled={!repo.commits.some((commit) => commit.hash === repo.head)} title="Select the current branch tip"><Icon name="commit" size={13} />Jump to HEAD</button></div>
       <div className="graph-search">
         <Icon name="search" size={14} />
@@ -240,7 +225,7 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
         </select>
         {q && searchMode === 'visible' && matchCount > 0 && <span className="graph-match-nav"><button onClick={() => moveMatch(-1)} aria-label="Previous search match">↑</button><button onClick={() => moveMatch(1)} aria-label="Next search match">↓</button></span>}
         {searchLoading && <span className="spinner graph-search-spinner" role="status" aria-label="Searching history" />}
-        {q && (
+        {q && (searchStatus === 'off' || searchStatus === 'ready') && (
           <span className="graph-search-count">
             {matchCount} match{matchCount === 1 ? '' : 'es'}
           </span>
@@ -252,7 +237,7 @@ export default function GraphView({ repo, selected, onSelectCommit, onSelectWip,
         )}
       </div>
       {searchError && <div className="graph-search-error" role="alert">{searchError}</div>}
-      {q && !searchLoading && searchMode !== 'visible' && nodes.length === 0 && (
+      {searchStatus === 'ready' && nodes.length === 0 && (
         <div className="graph-search-empty">No commits matched this search.</div>
       )}
       {q && searchResults?.truncated && <div className="graph-search-note">Showing the newest 200 matches.</div>}

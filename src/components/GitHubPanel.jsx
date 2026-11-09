@@ -1,5 +1,8 @@
 import ModalOverlay from './ModalOverlay'
 import { useEffect, useState } from 'react'
+import useMachine from '../hooks/useMachine'
+import useResource from '../hooks/useResource'
+import { operationMachine } from '../lib/machines'
 import Icon from './Icon'
 import { relativeTime, shortHash } from '../lib/format'
 
@@ -20,20 +23,20 @@ function Labels({ labels }) {
 
 export default function GitHubPanel({ repoPath, onClose, onCreate, onSettings, toast }) {
   const [tab, setTab] = useState('pulls')
-  const [pullData, setPullData] = useState(null)
-  const [issues, setIssues] = useState(null)
+  const [issuesWanted, setIssuesWanted] = useState(false)
   const [selectedNumber, setSelectedNumber] = useState(null)
-  const [detail, setDetail] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [detailLoading, setDetailLoading] = useState(false)
-  const [error, setError] = useState(null)
   const [mergeOpen, setMergeOpen] = useState(false)
   const [mergeMethod, setMergeMethod] = useState('squash')
-  const [mergeBusy, setMergeBusy] = useState(false)
   const [reviewBody, setReviewBody] = useState('')
   const [reviewEvent, setReviewEvent] = useState('COMMENT')
-  const [reviewBusy, setReviewBusy] = useState(false)
   const [openingUrl, setOpeningUrl] = useState(null)
+  // One review or merge at a time. While one runs, the selection, tabs, Refresh
+  // and Close are locked, so the result always lands on the pull request it
+  // was started for.
+  const [action, sendAction] = useMachine(operationMachine)
+  const acting = action.value === 'running'
+  const mergeBusy = action.context.kind === 'merge'
+  const reviewBusy = action.context.kind === 'review'
 
   const unwrap = async (promise) => {
     const result = await promise
@@ -41,79 +44,33 @@ export default function GitHubPanel({ repoPath, onClose, onCreate, onSettings, t
     return result.data
   }
 
-  const loadPulls = async (keepSelection = false) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await unwrap(window.api.listGitHubPullRequests(repoPath))
-      setPullData(data)
-      if (!keepSelection || !data.pulls.some((pull) => pull.number === selectedNumber)) {
-        setSelectedNumber(data.pulls[0]?.number || null)
-      }
-    } catch (loadError) {
-      setError(loadError?.message || 'Pull requests could not be loaded.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const pulls = useResource(() => unwrap(window.api.listGitHubPullRequests(repoPath)), [repoPath], { keepData: true })
+  const issues = useResource(() => unwrap(window.api.listGitHubIssues(repoPath)), [repoPath], { enabled: issuesWanted, keepData: true })
+  const detail = useResource(() => unwrap(window.api.getGitHubPullRequest(repoPath, selectedNumber)), [repoPath, selectedNumber], {
+    enabled: selectedNumber != null,
+  })
+  const pullData = pulls.data
+  const pullDetail = detail.data?.number === selectedNumber ? detail.data : null
 
-  const loadIssues = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await unwrap(window.api.listGitHubIssues(repoPath))
-      setIssues(data)
-    } catch (loadError) {
-      setError(loadError?.message || 'Issues could not be loaded.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  // Keep the selection on a pull request that is still open, or pick the first.
   useEffect(() => {
-    loadPulls()
-    // Initial load is tied to the repository for the lifetime of this panel.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [repoPath])
+    const list = pullData?.pulls
+    if (!list) return
+    if (!list.some((pull) => pull.number === selectedNumber)) setSelectedNumber(list[0]?.number ?? null)
+  }, [pullData, selectedNumber])
 
+  // A new selection starts with an empty review form and the merge closed.
   useEffect(() => {
-    if (tab === 'issues' && !issues && !loading) loadIssues()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab])
-
-  useEffect(() => {
-    let alive = true
-    if (!selectedNumber || tab !== 'pulls') {
-      setDetail(null)
-      return undefined
-    }
-    setDetailLoading(true)
-    setError(null)
     setMergeOpen(false)
-    window.api.getGitHubPullRequest(repoPath, selectedNumber)
-      .then((result) => {
-        if (!alive) return
-        if (result?.ok) setDetail(result.data)
-        else setError(result?.error || 'Pull request details could not be loaded.')
-      })
-      .catch((loadError) => {
-        if (alive) setError(loadError?.message || 'Pull request details could not be loaded.')
-      })
-      .finally(() => {
-        if (alive) setDetailLoading(false)
-      })
-    return () => {
-      alive = false
-    }
-  }, [repoPath, selectedNumber, tab])
+    setReviewBody('')
+    setReviewEvent('COMMENT')
+  }, [selectedNumber])
 
-  useEffect(() => {
-    const onKey = (event) => {
-      if (event.key === 'Escape' && !mergeBusy && !reviewBusy) onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [mergeBusy, reviewBusy, onClose])
+  const showTab = (next) => {
+    if (acting) return
+    setTab(next)
+    if (next === 'issues') setIssuesWanted(true)
+  }
 
   const openExternal = async (url) => {
     setOpeningUrl(url)
@@ -127,54 +84,53 @@ export default function GitHubPanel({ repoPath, onClose, onCreate, onSettings, t
   }
 
   const mergePull = async () => {
-    setMergeBusy(true)
+    if (!pullDetail || !sendAction({ type: 'START', kind: 'merge' })) return
     try {
-      await unwrap(window.api.mergeGitHubPullRequest(repoPath, detail.number, mergeMethod, detail.head.sha))
-      toast('success', `Merged pull request #${detail.number}.`)
-      setDetail(null)
+      await unwrap(window.api.mergeGitHubPullRequest(repoPath, pullDetail.number, mergeMethod, pullDetail.head.sha))
+      toast('success', `Merged pull request #${pullDetail.number}.`)
       setMergeOpen(false)
-      await loadPulls()
+      pulls.reload()
     } catch (mergeError) {
       toast('error', mergeError?.message || 'The pull request could not be merged.')
     } finally {
-      setMergeBusy(false)
+      sendAction({ type: 'FINISH' })
     }
   }
 
   const submitReview = async () => {
-    setReviewBusy(true)
+    if (!pullDetail || !sendAction({ type: 'START', kind: 'review' })) return
     try {
-      await unwrap(window.api.createGitHubReview(repoPath, detail.number, reviewEvent, reviewBody.trim(), detail.head.sha))
+      await unwrap(window.api.createGitHubReview(repoPath, pullDetail.number, reviewEvent, reviewBody.trim(), pullDetail.head.sha))
       toast('success', reviewEvent === 'APPROVE' ? 'Review approved.' : reviewEvent === 'REQUEST_CHANGES' ? 'Changes requested.' : 'Review comment submitted.')
       setReviewBody('')
-      const refreshed = await unwrap(window.api.getGitHubPullRequest(repoPath, detail.number))
-      setDetail(refreshed)
+      detail.reload()
     } catch (reviewError) {
       toast('error', reviewError?.message || 'The review could not be submitted.')
     } finally {
-      setReviewBusy(false)
+      sendAction({ type: 'FINISH' })
     }
   }
 
-  const authenticated = pullData?.authenticated || issues?.authenticated
+  const listed = tab === 'pulls' ? pulls : issues
+  const authenticated = pullData?.authenticated || issues.data?.authenticated
 
   return (
-    <ModalOverlay className="modal-overlay github-overlay" onClick={() => !mergeBusy && !reviewBusy && onClose()}>
-      <section className="github-panel" role="dialog" aria-modal="true" aria-labelledby="github-title" onClick={(event) => event.stopPropagation()}>
+    <ModalOverlay className="modal-overlay github-overlay" onClick={() => !acting && onClose()}>
+      <section className="github-panel" role="dialog" aria-modal="true" aria-labelledby="github-title" data-state={listed.status} data-action={acting ? action.context.kind : 'idle'} onClick={(event) => event.stopPropagation()}>
         <header className="github-head">
           <div>
             <span className="file-inspector-kicker">GitHub</span>
             <h2 id="github-title">{pullData?.repository ? `${pullData.repository.owner}/${pullData.repository.repo}` : 'Repository collaboration'}</h2>
           </div>
           <div className="github-head-actions">
-            <button className="ghost-btn" onClick={() => tab === 'pulls' ? loadPulls(true) : loadIssues()} disabled={loading}>
-              {loading ? <><span className="spinner" /> Refreshing…</> : <><Icon name="refresh" size={13} /> Refresh</>}
+            <button className="ghost-btn" onClick={() => listed.reload()} disabled={acting || listed.status === 'loading'}>
+              {listed.status === 'loading' ? <><span className="spinner" /> Refreshing…</> : <><Icon name="refresh" size={13} /> Refresh</>}
             </button>
-            <button className="activity-close" onClick={onClose} aria-label="Close GitHub panel"><Icon name="x" /></button>
+            <button className="activity-close" onClick={onClose} disabled={acting} aria-label="Close GitHub panel"><Icon name="x" /></button>
           </div>
         </header>
 
-        {!authenticated && !loading && !error && (
+        {!authenticated && listed.status === 'ready' && (
           <div className="github-auth-banner">
             <span>Public read-only mode. Save a fine-grained GitHub token to review, merge, and access private repositories.</span>
             <button onClick={onSettings}>Open Settings</button>
@@ -182,25 +138,25 @@ export default function GitHubPanel({ repoPath, onClose, onCreate, onSettings, t
         )}
 
         <div className="github-tabs" role="tablist">
-          <button role="tab" aria-selected={tab === 'pulls'} className={tab === 'pulls' ? 'active' : ''} onClick={() => setTab('pulls')}>Pull requests</button>
-          <button role="tab" aria-selected={tab === 'issues'} className={tab === 'issues' ? 'active' : ''} onClick={() => setTab('issues')}>Issues</button>
+          <button role="tab" aria-selected={tab === 'pulls'} className={tab === 'pulls' ? 'active' : ''} disabled={acting} onClick={() => showTab('pulls')}>Pull requests</button>
+          <button role="tab" aria-selected={tab === 'issues'} className={tab === 'issues' ? 'active' : ''} disabled={acting} onClick={() => showTab('issues')}>Issues</button>
           <span />
           <button className="github-create" onClick={onCreate}><Icon name="plus" size={13} /> Create pull request</button>
         </div>
 
-        {error ? (
+        {listed.status === 'failed' ? (
           <div className="inspector-status inspector-error" role="alert">
-            <strong>GitHub could not be loaded</strong>
-            <span>{error}</span>
-            <button className="primary-btn" onClick={() => tab === 'pulls' ? loadPulls() : loadIssues()}>Try again</button>
+            <strong>{tab === 'pulls' ? 'Pull requests could not be loaded' : 'Issues could not be loaded'}</strong>
+            <span>{listed.error}</span>
+            <button className="primary-btn" onClick={() => listed.reload()}>Try again</button>
           </div>
-        ) : loading && !pullData ? (
-          <div className="inspector-status" role="status"><span className="spinner" /> Loading GitHub…</div>
+        ) : !listed.data ? (
+          <div className="inspector-status" role="status"><span className="spinner" /> {tab === 'pulls' ? 'Loading pull requests…' : 'Loading issues…'}</div>
         ) : tab === 'issues' ? (
           <div className="github-issues">
-            {loading && <div className="github-inline-loading"><span className="spinner" /> Loading issues…</div>}
-            {!loading && issues?.issues?.length === 0 && <div className="inspector-status">No open issues.</div>}
-            {(issues?.issues || []).map((issue) => (
+            {issues.status === 'loading' && <div className="github-inline-loading"><span className="spinner" /> Loading issues…</div>}
+            {issues.status === 'ready' && issues.data.issues.length === 0 && <div className="inspector-status">No open issues.</div>}
+            {(issues.data?.issues || []).map((issue) => (
               <button key={issue.number} className="github-issue-row" onClick={() => openExternal(issue.htmlUrl)} disabled={openingUrl === issue.htmlUrl}>
                 <GitHubAvatar user={issue.author} />
                 <span className="github-list-main">
@@ -217,7 +173,7 @@ export default function GitHubPanel({ repoPath, onClose, onCreate, onSettings, t
             <aside className="github-pr-list">
               {pullData?.pulls?.length === 0 && <div className="inspector-status">No open pull requests.</div>}
               {(pullData?.pulls || []).map((pull) => (
-                <button key={pull.number} className={selectedNumber === pull.number ? 'selected' : ''} onClick={() => setSelectedNumber(pull.number)}>
+                <button key={pull.number} className={selectedNumber === pull.number ? 'selected' : ''} disabled={acting} onClick={() => setSelectedNumber(pull.number)}>
                   <GitHubAvatar user={pull.author} />
                   <span className="github-list-main">
                     <strong>#{pull.number} {pull.title}</strong>
@@ -229,38 +185,46 @@ export default function GitHubPanel({ repoPath, onClose, onCreate, onSettings, t
               ))}
             </aside>
 
-            <main className="github-pr-detail">
-              {detailLoading ? (
-                <div className="inspector-status" role="status"><span className="spinner" /> Loading pull request…</div>
-              ) : !detail ? (
-                <div className="inspector-status">Select a pull request to inspect it.</div>
+            <main className="github-pr-detail" data-state={detail.status}>
+              {detail.status === 'failed' ? (
+                <div className="inspector-status inspector-error" role="alert">
+                  <strong>This pull request could not be loaded</strong>
+                  <span>{detail.error}</span>
+                  <button className="primary-btn" onClick={() => detail.reload()}>Try again</button>
+                </div>
+              ) : !pullDetail ? (
+                selectedNumber != null ? (
+                  <div className="inspector-status" role="status"><span className="spinner" /> Loading pull request…</div>
+                ) : (
+                  <div className="inspector-status">Select a pull request to inspect it.</div>
+                )
               ) : (
                 <>
                   <div className="github-detail-head">
                     <div>
-                      <span className="github-pr-number">Pull request #{detail.number}</span>
-                      <h3>{detail.title}</h3>
-                      <div className="github-detail-author"><GitHubAvatar user={detail.author} size={22} /> {detail.author.login}</div>
+                      <span className="github-pr-number">Pull request #{pullDetail.number}</span>
+                      <h3>{pullDetail.title}</h3>
+                      <div className="github-detail-author"><GitHubAvatar user={pullDetail.author} size={22} /> {pullDetail.author.login}</div>
                     </div>
-                    <button className="ghost-btn" onClick={() => openExternal(detail.htmlUrl)} disabled={openingUrl === detail.htmlUrl}>
-                      {openingUrl === detail.htmlUrl ? <><span className="spinner" /> Opening…</> : 'Open on GitHub'}
+                    <button className="ghost-btn" onClick={() => openExternal(pullDetail.htmlUrl)} disabled={openingUrl === pullDetail.htmlUrl}>
+                      {openingUrl === pullDetail.htmlUrl ? <><span className="spinner" /> Opening…</> : 'Open on GitHub'}
                     </button>
                   </div>
 
                   <div className="github-pr-facts">
-                    <span><strong>{detail.commits}</strong> commits</span>
-                    <span><strong>{detail.changedFiles}</strong> files</span>
-                    <span className="add">+{detail.additions}</span>
-                    <span className="del">−{detail.deletions}</span>
-                    <span className={`github-ci github-ci-${detail.ci.state}`}>{detail.ci.state === 'success' ? 'Checks passed' : detail.ci.state === 'failure' ? `${detail.ci.failed} checks failed` : detail.ci.state === 'pending' ? 'Checks running' : 'No checks reported'}</span>
+                    <span><strong>{pullDetail.commits}</strong> commits</span>
+                    <span><strong>{pullDetail.changedFiles}</strong> files</span>
+                    <span className="add">+{pullDetail.additions}</span>
+                    <span className="del">−{pullDetail.deletions}</span>
+                    <span className={`github-ci github-ci-${pullDetail.ci.state}`}>{pullDetail.ci.state === 'success' ? 'Checks passed' : pullDetail.ci.state === 'failure' ? `${pullDetail.ci.failed} checks failed` : pullDetail.ci.state === 'pending' ? 'Checks running' : 'No checks reported'}</span>
                   </div>
-                  <div className="github-branches"><code>{detail.base.ref}</code><span>←</span><code>{detail.head.ref}</code><small>{shortHash(detail.head.sha)}</small></div>
-                  {detail.body && <div className="github-pr-body">{detail.body}</div>}
+                  <div className="github-branches"><code>{pullDetail.base.ref}</code><span>←</span><code>{pullDetail.head.ref}</code><small>{shortHash(pullDetail.head.sha)}</small></div>
+                  {pullDetail.body && <div className="github-pr-body">{pullDetail.body}</div>}
 
                   <section className="github-reviews">
                     <h4>Reviews</h4>
-                    {detail.reviews.length === 0 && <p>No reviews submitted yet.</p>}
-                    {detail.reviews.map((review) => (
+                    {pullDetail.reviews.length === 0 && <p>No reviews submitted yet.</p>}
+                    {pullDetail.reviews.map((review) => (
                       <div key={review.id} className="github-review">
                         <GitHubAvatar user={review.author} size={22} />
                         <span><strong>{review.author.login}</strong><small>{review.state.replace(/_/g, ' ').toLowerCase()}</small>{review.body && <p>{review.body}</p>}</span>
@@ -277,7 +241,7 @@ export default function GitHubPanel({ repoPath, onClose, onCreate, onSettings, t
                         <option value="APPROVE">Approve</option>
                         <option value="REQUEST_CHANGES">Request changes</option>
                       </select>
-                      <button className="primary-btn" onClick={submitReview} disabled={reviewBusy || (reviewEvent !== 'APPROVE' && !reviewBody.trim()) || !detail.authenticated}>
+                      <button className="primary-btn" onClick={submitReview} disabled={acting || (reviewEvent !== 'APPROVE' && !reviewBody.trim()) || !pullDetail.authenticated}>
                         {reviewBusy ? <><span className="spinner" /> Submitting…</> : 'Submit review'}
                       </button>
                     </div>
@@ -285,17 +249,17 @@ export default function GitHubPanel({ repoPath, onClose, onCreate, onSettings, t
 
                   <section className="github-merge-zone">
                     {!mergeOpen ? (
-                      <button className="primary-btn" onClick={() => setMergeOpen(true)} disabled={!detail.authenticated || detail.draft || detail.mergeable === false || detail.ci.state === 'failure'}>Review merge options</button>
+                      <button className="primary-btn" onClick={() => setMergeOpen(true)} disabled={acting || !pullDetail.authenticated || pullDetail.draft || pullDetail.mergeable === false || pullDetail.ci.state === 'failure'}>Review merge options</button>
                     ) : (
                       <div className="github-merge-confirm">
-                        <strong>Merge pull request #{detail.number}?</strong>
-                        <p>GitVista merges only while the head commit is still <code>{shortHash(detail.head.sha)}</code>. If someone pushes a new commit after your review, the merge is refused.</p>
+                        <strong>Merge pull request #{pullDetail.number}?</strong>
+                        <p>GitVista merges only while the head commit is still <code>{shortHash(pullDetail.head.sha)}</code>. If someone pushes a new commit after your review, the merge is refused.</p>
                         <select name="github-merge-method" value={mergeMethod} disabled={mergeBusy} onChange={(event) => setMergeMethod(event.target.value)}>
                           <option value="squash">Squash and merge</option>
                           <option value="merge">Create a merge commit</option>
                           <option value="rebase">Rebase and merge</option>
                         </select>
-                        <div><button className="ghost-btn" onClick={() => setMergeOpen(false)} disabled={mergeBusy}>Cancel</button><button className="primary-btn" onClick={mergePull} disabled={mergeBusy}>{mergeBusy ? <><span className="spinner" /> Merging…</> : 'Merge on GitHub'}</button></div>
+                        <div><button className="ghost-btn" onClick={() => setMergeOpen(false)} disabled={mergeBusy}>Cancel</button><button className="primary-btn" onClick={mergePull} disabled={acting}>{mergeBusy ? <><span className="spinner" /> Merging…</> : 'Merge on GitHub'}</button></div>
                       </div>
                     )}
                   </section>
