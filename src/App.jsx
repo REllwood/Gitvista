@@ -1,5 +1,5 @@
 import ModalOverlay from './components/ModalOverlay'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import Toolbar from './components/Toolbar'
 import StatusBar from './components/StatusBar'
 import Sidebar from './components/Sidebar'
@@ -32,6 +32,9 @@ import { parseGitHubRemote } from './lib/github'
 import { appendCoAuthors } from './lib/commitMessage'
 import { call, changedFileCount } from './lib/repositorySession'
 import useRepository from './hooks/useRepository'
+import useMachine from './hooks/useMachine'
+import useSurfaces from './hooks/useSurfaces'
+import { operationMachine } from './lib/machines'
 import { executeGitAction, successMessage } from './lib/gitActions'
 
 const basename = (p) => (p || '').replace(/[/\\]+$/, '').split(/[/\\]/).filter(Boolean).pop() || p
@@ -58,42 +61,50 @@ function headHash(data) {
 
 export default function App() {
   const [openingRecent, setOpeningRecent] = useState(null)
-  const [busy, setBusyState] = useState(false)
-  const [commitBusy, setCommitBusy] = useState(false)
+  // Explicit state machines (see lib/machines.js). The operation machine says
+  // what GitVista is running, and the surface machine records which dialogs and
+  // panels are open, in order. Each surface keeps its useState-shaped name.
+  const [operation, sendOperation, operationRef] = useMachine(operationMachine)
+  const busy = operation.value === 'running'
+  const commitBusy = operation.context.kind === 'commit'
+  const busyRef = useMemo(() => ({ get current() { return operationRef.current.value === 'running' } }), [operationRef])
+  const setBusy = useCallback(
+    (running, kind = 'git') => sendOperation(running ? { type: 'START', kind } : { type: 'FINISH' }),
+    [sendOperation]
+  )
+  const surfaces = useSurfaces()
   const [theme, setTheme] = useState(() => localStorage.getItem('gitvista:theme') || 'system')
   const [sidebarWidth, setSidebarWidth] = useState(() => savedNumber('gitvista:sidebarWidth', 224, 190, 420))
   const [rightPanelWidth, setRightPanelWidth] = useState(() => savedNumber('gitvista:rightPanelWidth', 360, 290, 620))
   const [updateStatus, setUpdateStatus] = useState({ state: 'idle' })
   const [activities, setActivities] = useState([])
-  const [activityOpen, setActivityOpen] = useState(false)
-  const [fileInspector, setFileInspector] = useState(null)
-  const [commandOpen, setCommandOpen] = useState(false)
-  const [prOpen, setPrOpen] = useState(false)
-  const [githubOpen, setGitHubOpen] = useState(false)
+  const [activityOpen, setActivityOpen] = surfaces.slot('activity', false)
+  const [fileInspector, setFileInspector] = surfaces.slot('file-inspector')
+  const [commandOpen, setCommandOpen] = surfaces.slot('command', false)
+  const [prOpen, setPrOpen] = surfaces.slot('pull-request', false)
+  const [githubOpen, setGitHubOpen] = surfaces.slot('github', false)
 
-  const [action, setAction] = useState(null)
-  const [confirm, setConfirm] = useState(null)
-  const [initPrompt, setInitPrompt] = useState(null)
-  const [cloneOpen, setCloneOpen] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [remoteModalOpen, setRemoteModalOpen] = useState(false)
-  const [trackingBranch, setTrackingBranch] = useState(null)
-  const [worktreeOpen, setWorktreeOpen] = useState(false)
-  const [compareState, setCompareState] = useState(null)
+  const [action, setAction] = surfaces.slot('action')
+  const [confirm, setConfirm] = surfaces.slot('confirm')
+  const [initPrompt, setInitPrompt] = surfaces.slot('init-prompt')
+  const [cloneOpen, setCloneOpen] = surfaces.slot('clone', false)
+  const [settingsOpen, setSettingsOpen] = surfaces.slot('settings', false)
+  const [remoteModalOpen, setRemoteModalOpen] = surfaces.slot('add-remote', false)
+  const [trackingBranch, setTrackingBranch] = surfaces.slot('tracking')
+  const [worktreeOpen, setWorktreeOpen] = surfaces.slot('worktree', false)
+  const [compareState, setCompareState] = surfaces.slot('compare')
   const [compareBase, setCompareBase] = useState(null)
-  const [irebaseState, setIrebaseState] = useState(null)
+  const [irebaseState, setIrebaseState] = surfaces.slot('interactive-rebase')
 
-  const [helpOpen, setHelpOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = surfaces.slot('help', false)
   const [helpTerm, setHelpTerm] = useState(null)
-  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = surfaces.slot('history', false)
   const [reflog, setReflog] = useState([])
 
-  const [diffState, setDiffState] = useState(null)
+  const [diffState, setDiffState] = surfaces.slot('diff')
   const diffRequest = useRef(0)
-  const busyRef = useRef(false)
   const shortcutHandler = useRef(null)
-  const setBusy = useCallback((value) => { busyRef.current = value; setBusyState(value) }, [])
-  const [menu, setMenu] = useState(null)
+  const [menu, setMenu] = surfaces.slot('menu')
 
   const [toasts, setToasts] = useState([])
 
@@ -187,7 +198,7 @@ export default function App() {
   async function openHistory() {
     if (busyRef.current) return
     if (!repoPath) return
-    setBusy(true)
+    setBusy(true, 'history')
     try {
       setReflog(await call(window.api.getReflog(repoPath)))
     } catch (error) {
@@ -209,7 +220,7 @@ export default function App() {
     // switch is undone by switching back (a reset would move the wrong branch);
     // a rebase via ORIG_HEAD; everything else by returning to the prior commit.
     let target = null
-    setBusy(true)
+    setBusy(true, 'undo')
     try {
       target = await call(window.api.getUndoTarget(repoPath))
     } catch (error) {
@@ -251,7 +262,7 @@ export default function App() {
   async function doInit(dir) {
     if (busyRef.current) return
     setInitPrompt(null)
-    setBusy(true)
+    setBusy(true, 'init')
     try {
       await call(window.api.initRepo(dir))
       toast('success', 'New Git repository created.')
@@ -306,7 +317,7 @@ export default function App() {
 
   async function openSandbox() {
     if (busyRef.current) return
-    setBusy(true)
+    setBusy(true, 'sandbox')
     try {
       const path = await call(window.api.createSandbox())
       const opened = await openTab(path)
@@ -330,7 +341,7 @@ export default function App() {
   // ---- create pull request ----
   async function createPR({ url, needsPush }) {
     if (busyRef.current) return
-    setBusy(true)
+    setBusy(true, 'pull-request')
     let err = null
     try {
       if (needsPush) await call(window.api.push(repoPath))
@@ -353,7 +364,7 @@ export default function App() {
       onYes: async () => {
         if (busyRef.current) return
         setConfirm(null)
-        setBusy(true)
+        setBusy(true, 'update')
         try {
           await call(window.api.installUpdate())
         } catch (error) {
@@ -375,7 +386,7 @@ export default function App() {
   }
   async function doClone({ url, dir, name }) {
     if (busyRef.current) return
-    setBusy(true)
+    setBusy(true, 'clone')
     let dest = null
     let err = null
     try {
@@ -416,7 +427,7 @@ export default function App() {
   // ---- file/staging ops ----
   async function fileOp(fn) {
     if (busyRef.current) return
-    setBusy(true)
+    setBusy(true, 'files')
     try {
       await call(fn())
     } catch (e) {
@@ -445,8 +456,7 @@ export default function App() {
 
   async function doCommit() {
     if (busyRef.current) return
-    setCommitBusy(true)
-    setBusy(true)
+    setBusy(true, 'commit')
     let ok = false
     let err = null
     try {
@@ -456,7 +466,6 @@ export default function App() {
       err = e.message
     }
     const data = await refreshAfterOperation()
-    setCommitBusy(false)
     setBusy(false)
     if (ok) {
       setCommitMessage('')
@@ -480,7 +489,7 @@ export default function App() {
   // ---- actions via modal ----
   async function runAction(a) {
     if (busyRef.current) return
-    setBusy(true)
+    setBusy(true, 'action')
     let ok = false
     let errMsg = null
     try {
@@ -508,7 +517,7 @@ export default function App() {
   async function runConflict(kind) {
     if (busyRef.current) return
     const op = repo?.conflict?.inProgress
-    setBusy(true)
+    setBusy(true, 'conflict')
     let ok = false
     let err = null
     try {
@@ -537,7 +546,7 @@ export default function App() {
   const onMarkResolved = (file) => fileOp(() => window.api.markResolved(repoPath, file))
   const onOpenFile = async (file) => {
     if (busyRef.current) return
-    setBusy(true)
+    setBusy(true, 'open-file')
     try {
       await call(window.api.openRepoFile(repoPath, file))
     } catch (error) {
@@ -583,7 +592,7 @@ export default function App() {
   async function changeHunk(patch, staged) {
     if (busyRef.current) return
     const state = diffState
-    setBusy(true)
+    setBusy(true, 'hunk')
     try {
       await call((staged ? window.api.unstageHunk : window.api.stageHunk)(repoPath, patch))
       await refreshAfterOperation()
@@ -630,7 +639,7 @@ export default function App() {
     else if (type === 'revert') setAction({ type: 'revert', ...base })
     else if (type === 'uncommit') setAction({ type: 'uncommit' })
     else if (type === 'amend') {
-      setBusy(true)
+      setBusy(true, 'commit-action')
       try {
         const info = await call(window.api.getCommitFiles(repoPath, node.hash))
         setAction({ type: 'amend', message: info.body })
@@ -644,7 +653,7 @@ export default function App() {
     else if (type === 'reset-mixed') setAction({ type: 'reset', mode: 'mixed', ...base })
     else if (type === 'reset-hard') setAction({ type: 'reset', mode: 'hard', ...base })
     else if (type === 'copy') {
-      setBusy(true)
+      setBusy(true, 'commit-action')
       try {
         await call(window.api.writeClipboardText(node.hash))
         toast('info', 'Commit ID copied to clipboard.')
@@ -702,7 +711,7 @@ export default function App() {
   async function runInteractiveRebase(todo) {
     if (busyRef.current) return
     const st = irebaseState
-    setBusy(true)
+    setBusy(true, 'rebase')
     let ok = false
     let err = null
     try {
@@ -836,7 +845,7 @@ export default function App() {
   const onAddRemote = () => setRemoteModalOpen(true)
   async function doAddRemote({ name, url }) {
     if (busyRef.current) return
-    setBusy(true)
+    setBusy(true, 'remote')
     try {
       await call(window.api.addRemote(repoPath, name, url))
       toast('success', `Added remote “${name}”.`)
@@ -861,7 +870,7 @@ export default function App() {
 
   async function updateUpstream(branch, upstream) {
     if (busyRef.current) return
-    setBusy(true)
+    setBusy(true, 'upstream')
     try {
       await call(window.api.setUpstream(repoPath, branch, upstream))
       await refresh()
@@ -876,7 +885,7 @@ export default function App() {
 
   async function unsetUpstream(branch) {
     if (busyRef.current) return
-    setBusy(true)
+    setBusy(true, 'upstream')
     try {
       await call(window.api.unsetUpstream(repoPath, branch))
       await refresh()
@@ -900,7 +909,7 @@ export default function App() {
 
   async function createWorktree({ parentDir, folderName, ref, newBranch, openAfter }) {
     if (busyRef.current) return
-    setBusy(true)
+    setBusy(true, 'worktree')
     let target = null
     try {
       target = await call(window.api.addWorktree(repoPath, parentDir, folderName, ref, newBranch))
@@ -917,6 +926,15 @@ export default function App() {
 
   const status = repo?.status || {}
   const dirtyCount = changedFileCount(status)
+  // Derived states, published on the app root next to the machines above.
+  const repositoryState = !repoPath ? 'none' : !repo ? 'opening' : loading ? 'refreshing' : 'ready'
+  const worktreeState = !repo
+    ? 'none'
+    : repo.conflict?.inProgress || repo.conflict?.conflictedFiles?.length > 0
+      ? 'conflicted'
+      : dirtyCount > 0
+        ? 'changed'
+        : 'clean'
   const originUrl = repo?.remotes?.find((r) => r.name === 'origin')?.url || repo?.remotes?.[0]?.url
   const ghInfo = originUrl ? parseGitHubRemote(originUrl) : null
   const githubAvailable = !!(repo && ghInfo && ghInfo.isGitHub)
@@ -1159,9 +1177,9 @@ export default function App() {
   shortcutHandler.current = (event) => {
     const key = event.key.toLowerCase()
     const modifier = isMac ? event.metaKey : event.ctrlKey
-    const blockingSurface =
-      action || confirm || initPrompt || helpOpen || historyOpen || activityOpen || prOpen || githubOpen || cloneOpen ||
-      settingsOpen || remoteModalOpen || trackingBranch || worktreeOpen || diffState || fileInspector || compareState || irebaseState
+    // Any open dialog or panel blocks shortcuts. The context menu and the
+    // command palette are handled separately.
+    const blockingSurface = surfaces.stack.some(({ surface }) => surface !== 'menu' && surface !== 'command')
     if (modifier && key === 'k') {
       event.preventDefault()
       if (!commandDisabled && (commandOpen || !blockingSurface)) setCommandOpen((open) => !open)
@@ -1199,7 +1217,14 @@ export default function App() {
 
   return (
     <HelpContext.Provider value={openHelp}>
-      <div className="app" style={{ '--sidebar-width': `${sidebarWidth}px`, '--rightpanel-width': `${rightPanelWidth}px` }}>
+      <div
+        className="app"
+        data-operation={busy ? operation.context.kind : 'idle'}
+        data-surface={surfaces.top ?? 'none'}
+        data-repository={repositoryState}
+        data-worktree={worktreeState}
+        style={{ '--sidebar-width': `${sidebarWidth}px`, '--rightpanel-width': `${rightPanelWidth}px` }}
+      >
         {(loading || busy) && <div className="loading-bar" role="progressbar" aria-label="GitVista is working" />}
         <Toolbar
           repo={repo}

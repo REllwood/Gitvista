@@ -1,20 +1,14 @@
-import { useEffect } from 'react'
 import Icon from './Icon'
+import ModalOverlay from './ModalOverlay'
 import { shortHash, relativeTime } from '../lib/format'
 
 // Slide-in reflog browser — Git's safety net. Lists every recent move of HEAD
 // (commit, reset, rebase, merge, checkout…) newest-first, and lets you restore
 // your branch to any earlier point to undo a mistake.
 export default function HistoryPanel({ entries, onRestore, onClose }) {
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   return (
-    <div className="help-overlay" onClick={onClose}>
-      <aside className="help-panel history-panel" onClick={(e) => e.stopPropagation()}>
+    <ModalOverlay className="help-overlay" onClick={onClose}>
+      <aside className="help-panel history-panel" aria-label="History and undo" onClick={(e) => e.stopPropagation()}>
         <div className="help-head">
           <span>History &amp; undo</span>
           <button className="icon-btn" onClick={onClose} aria-label="Close history">
@@ -48,6 +42,6 @@ export default function HistoryPanel({ entries, onRestore, onClose }) {
           ))}
         </div>
       </aside>
-    </div>
+    </ModalOverlay>
   )
 }
