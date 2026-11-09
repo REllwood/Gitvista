@@ -48,4 +48,33 @@ export const surfaceMachine = defineMachine({
   },
 })
 
-export const MACHINES = [operationMachine, surfaceMachine]
+// Data a panel loads from Git or GitHub. Each LOAD starts a numbered request,
+// and RESOLVE or REJECT only count when they answer the latest request, so a
+// slow earlier response can never replace newer data or clear a newer error.
+const startLoad = (context, event) => ({
+  request: context.request + 1,
+  data: event.keepData ? context.data : null,
+  error: null,
+})
+const latest = (context, event) => event.request === context.request
+const LOAD = { target: 'loading', update: startLoad }
+
+export const resourceMachine = defineMachine({
+  id: 'resource',
+  initial: 'idle',
+  context: { request: 0, data: null, error: null },
+  states: {
+    idle: { on: { LOAD } },
+    loading: {
+      on: {
+        LOAD,
+        RESOLVE: { target: 'ready', when: latest, update: (_, event) => ({ data: event.data, error: null }) },
+        REJECT: { target: 'failed', when: latest, update: (_, event) => ({ error: event.error }) },
+      },
+    },
+    ready: { on: { LOAD, UPDATE: { update: (context, event) => ({ data: event.update(context.data) }) } } },
+    failed: { on: { LOAD } },
+  },
+})
+
+export const MACHINES = [operationMachine, surfaceMachine, resourceMachine]

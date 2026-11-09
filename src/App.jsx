@@ -99,7 +99,6 @@ export default function App() {
   const [helpOpen, setHelpOpen] = surfaces.slot('help', false)
   const [helpTerm, setHelpTerm] = useState(null)
   const [historyOpen, setHistoryOpen] = surfaces.slot('history', false)
-  const [reflog, setReflog] = useState([])
 
   const [diffState, setDiffState] = surfaces.slot('diff')
   const diffRequest = useRef(0)
@@ -195,18 +194,10 @@ export default function App() {
   }, [])
 
   // ---- history / reflog / undo ----
-  async function openHistory() {
-    if (busyRef.current) return
-    if (!repoPath) return
-    setBusy(true, 'history')
-    try {
-      setReflog(await call(window.api.getReflog(repoPath)))
-    } catch (error) {
-      setReflog([])
-      toast('error', error?.message || 'History could not be loaded.')
-    } finally {
-      setBusy(false)
-    }
+  // The history panel loads the reflog itself, with its own loading and error
+  // states, so opening it never claims the operation slot.
+  function openHistory() {
+    if (busyRef.current || !repoPath) return
     setHistoryOpen(true)
   }
   const onRestore = (entry) => {
@@ -1448,7 +1439,7 @@ export default function App() {
 
         {helpOpen && <HelpPanel openTerm={helpTerm} onClose={() => setHelpOpen(false)} />}
 
-        {historyOpen && <HistoryPanel entries={reflog} onRestore={onRestore} onClose={() => setHistoryOpen(false)} />}
+        {historyOpen && repoPath && <HistoryPanel repoPath={repoPath} onRestore={onRestore} onClose={() => setHistoryOpen(false)} />}
 
         {activityOpen && (
           <ActivityPanel

@@ -4063,3 +4063,27 @@ button:disabled { cursor: not-allowed; }
   .repository-heading strong, .repository-slash { display: none; }
   .repository-tools .tb-divider { margin: 0 2px; }
 }
+
+/* Settings: the profile fields sit in a fieldset that locks while the profile
+   loads, fails to load or saves. */
+.settings-fields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.settings-fields:disabled {
+  opacity: 0.6;
+}
+.settings-load-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0 12px;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--text);
+  font-size: 12px;
+}

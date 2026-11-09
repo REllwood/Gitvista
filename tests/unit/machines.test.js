@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { defineMachine } from '../../src/lib/machine.js'
-import { MACHINES, operationMachine, surfaceMachine } from '../../src/lib/machines.js'
+import { MACHINES, operationMachine, surfaceMachine, resourceMachine } from '../../src/lib/machines.js'
 
 const targetsOf = (edge) =>
   typeof edge === 'string' ? [edge] : typeof edge.target === 'function' ? edge.targets : [edge.target ?? null]
@@ -63,4 +63,23 @@ test('surfaces stack in the order they open and close independently', () => {
   send({ type: 'CLOSE', surface: 'settings' })
   assert.equal(state.value, 'closed')
   assert.deepEqual(state.context.stack, [])
+})
+
+test('a slow earlier load cannot replace newer data or clear a newer error', () => {
+  let state = resourceMachine.initialState
+  const send = (event) => (state = resourceMachine.transition(state, event))
+  send({ type: 'LOAD' })
+  const first = state.context.request
+  send({ type: 'LOAD' })
+  const second = state.context.request
+  send({ type: 'REJECT', request: second, error: 'Network down' })
+  assert.deepEqual([state.value, state.context.error], ['failed', 'Network down'])
+  assert.equal(send({ type: 'RESOLVE', request: first, data: 'old' }), state)
+  assert.equal(state.value, 'failed')
+  send({ type: 'LOAD' })
+  assert.deepEqual([state.value, state.context.error, state.context.data], ['loading', null, null])
+  send({ type: 'RESOLVE', request: state.context.request, data: 'new' })
+  assert.deepEqual([state.value, state.context.data], ['ready', 'new'])
+  send({ type: 'LOAD', keepData: true })
+  assert.deepEqual([state.value, state.context.data], ['loading', 'new'])
 })

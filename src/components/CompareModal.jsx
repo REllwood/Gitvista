@@ -1,85 +1,42 @@
 import ModalOverlay from './ModalOverlay'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import DiffView from './DiffView'
 import Icon from './Icon'
+import useResource from '../hooks/useResource'
 import { shortHash } from '../lib/format'
 
 // Compares any two points in history (commits / branches / tags): a list of the
-// files that differ, with the chosen file's diff (unified or side-by-side).
+// files that differ, with the chosen file's diff (unified or side-by-side). The
+// file list and the selected file's diff load separately, so each pane shows
+// its own loading, error and empty state. Escape is answered by ModalOverlay.
 export default function CompareModal({ repoPath, a, b, aLabel, bLabel, onClose }) {
-  const [files, setFiles] = useState(null)
   const [sel, setSel] = useState(null)
-  const [diff, setDiff] = useState('')
-  const [loadingDiff, setLoadingDiff] = useState(false)
-  const [filesError, setFilesError] = useState(null)
-  const [diffError, setDiffError] = useState(null)
-  const [retry, setRetry] = useState(0)
   const [view, setView] = useState('unified')
-  const diffRequest = useRef(0)
 
+  const changed = useResource(async () => {
+    const result = await window.api.getChangedBetween(repoPath, a, b)
+    if (!result?.ok) throw new Error(result?.error || 'The comparison could not be loaded.')
+    return result.data || []
+  }, [repoPath, a, b])
+  const files = changed.data
+  const selected = files?.find((file) => file.path === sel) || null
+
+  const diff = useResource(
+    async () => {
+      const result = await window.api.getDiffBetween(repoPath, a, b, selected.path, selected.previousPath)
+      if (!result?.ok) throw new Error(result?.error || 'The file comparison could not be loaded.')
+      return { path: selected.path, text: result.data || '' }
+    },
+    [repoPath, a, b, selected?.path],
+    { enabled: !!selected }
+  )
+
+  // Select the first changed file whenever a new comparison loads.
   useEffect(() => {
-    let alive = true
-    let loadedFiles = false
-    const requestId = ++diffRequest.current
-    setFiles(null)
-    setFilesError(null)
-    setDiffError(null)
-    setDiff('')
-    setSel(null)
-    setLoadingDiff(false)
-    ;(async () => {
-      try {
-        const changed = await window.api.getChangedBetween(repoPath, a, b)
-        if (!changed?.ok) throw new Error(changed?.error || 'The comparison could not be loaded.')
-        if (!alive || requestId !== diffRequest.current) return
-        const list = changed.data || []
-        loadedFiles = true
-        setFiles(list)
-        if (list[0]) {
-          setSel(list[0].path)
-          setLoadingDiff(true)
-          const result = await window.api.getDiffBetween(repoPath, a, b, list[0].path, list[0].previousPath)
-          if (!result?.ok) throw new Error(result?.error || 'The file comparison could not be loaded.')
-          if (alive && requestId === diffRequest.current) setDiff(result.data || '')
-        }
-      } catch (error) {
-        if (!alive || requestId !== diffRequest.current) return
-        if (!loadedFiles) setFilesError(error?.message || 'The comparison could not be loaded.')
-        else setDiffError(error?.message || 'The file comparison could not be loaded.')
-      } finally {
-        if (alive && requestId === diffRequest.current) setLoadingDiff(false)
-      }
-    })()
-    return () => {
-      alive = false
-      diffRequest.current += 1
-    }
-  }, [repoPath, a, b, retry])
+    if (files) setSel(files[0]?.path ?? null)
+  }, [files])
 
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  async function selectFile(file) {
-    const path = file?.path || file
-    const previousPath = file?.previousPath || null
-    const requestId = ++diffRequest.current
-    setSel(path)
-    setLoadingDiff(true)
-    setDiffError(null)
-    setDiff('')
-    try {
-      const r = await window.api.getDiffBetween(repoPath, a, b, path, previousPath)
-      if (!r?.ok) throw new Error(r?.error || 'The file comparison could not be loaded.')
-      if (requestId === diffRequest.current) setDiff(r.data || '')
-    } catch (error) {
-      if (requestId === diffRequest.current) setDiffError(error?.message || 'The file comparison could not be loaded.')
-    } finally {
-      if (requestId === diffRequest.current) setLoadingDiff(false)
-    }
-  }
+  const diffText = diff.data?.path === sel ? diff.data.text : null
 
   return (
     <ModalOverlay className="modal-overlay" onClick={onClose}>
@@ -104,9 +61,9 @@ export default function CompareModal({ repoPath, a, b, aLabel, bLabel, onClose }
           </div>
         </div>
         <div className="compare-body">
-          <div className="compare-files">
-            {files == null && !filesError && <div className="side-empty" role="status"><span className="spinner" aria-hidden="true" /> Loading files…</div>}
-            {filesError && <div className="side-empty compare-error" role="alert"><span>{filesError}</span><button className="link-btn" onClick={() => setRetry((value) => value + 1)}>Try again</button></div>}
+          <div className="compare-files" data-state={changed.status}>
+            {(changed.status === 'loading' || changed.status === 'idle') && <div className="side-empty" role="status"><span className="spinner" aria-hidden="true" /> Loading files…</div>}
+            {changed.status === 'failed' && <div className="side-empty compare-error" role="alert"><span>{changed.error}</span><button className="link-btn" onClick={() => changed.reload()}>Try again</button></div>}
             {files && files.length === 0 && <div className="side-empty">No differences between these two points.</div>}
             {files &&
               files.map((f) => (
@@ -115,11 +72,11 @@ export default function CompareModal({ repoPath, a, b, aLabel, bLabel, onClose }
                   className={'compare-file' + (sel === f.path ? ' active' : '')}
                   role="button"
                   tabIndex={0}
-                  onClick={() => selectFile(f)}
+                  onClick={() => setSel(f.path)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault()
-                      selectFile(f)
+                      setSel(f.path)
                     }
                   }}
                   title={f.path}
@@ -132,13 +89,15 @@ export default function CompareModal({ repoPath, a, b, aLabel, bLabel, onClose }
                 </div>
               ))}
           </div>
-          <div className="compare-diff">
-            {loadingDiff ? (
+          <div className="compare-diff" data-state={selected ? diff.status : 'idle'}>
+            {!selected ? (
+              <div className="diff-empty">{files?.length ? 'Choose a file to see its changes.' : ''}</div>
+            ) : diff.status === 'failed' ? (
+              <div className="diff-error" role="alert"><div className="diff-error-title">Could not display this comparison</div><div className="diff-error-body">{diff.error}</div><button className="primary-btn" onClick={() => diff.reload()}>Try again</button></div>
+            ) : diffText === null ? (
               <div className="diff-empty" role="status"><span className="spinner" aria-hidden="true" /> Loading comparison…</div>
-            ) : diffError ? (
-              <div className="diff-error" role="alert"><div className="diff-error-title">Could not display this comparison</div><div className="diff-error-body">{diffError}</div><button className="primary-btn" onClick={() => sel && selectFile(files?.find((file) => file.path === sel) || sel)}>Try again</button></div>
             ) : (
-              <DiffView diff={diff} mode="diff" view={view} />
+              <DiffView diff={diffText} mode="diff" view={view} />
             )}
           </div>
         </div>

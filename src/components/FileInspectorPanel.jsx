@@ -1,5 +1,6 @@
 import ModalOverlay from './ModalOverlay'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import useResource from '../hooks/useResource'
 import Avatar from './Avatar'
 import Icon from './Icon'
 import { relativeTime, shortHash } from '../lib/format'
@@ -8,56 +9,33 @@ const BLAME_PAGE_SIZE = 250
 
 export default function FileInspectorPanel({ repoPath, file, refName, onClose, onOpenDiff, onSelectCommit }) {
   const [tab, setTab] = useState('history')
-  const [history, setHistory] = useState(null)
-  const [blame, setBlame] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [retry, setRetry] = useState(0)
+  const [blameWanted, setBlameWanted] = useState(false)
   const [visibleBlame, setVisibleBlame] = useState(BLAME_PAGE_SIZE)
 
-  useEffect(() => {
-    const onKey = (event) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  useEffect(() => {
-    let alive = true
-    if ((tab === 'history' && history) || (tab === 'blame' && blame)) return undefined
-    setLoading(true)
-    setError(null)
-    const request =
-      tab === 'history'
-        ? window.api.getFileHistory(repoPath, file, refName || null)
-        : window.api.getFileBlame(repoPath, file, refName || null)
-    request
-      .then((result) => {
-        if (!alive) return
-        if (!result?.ok) throw new Error(result?.error || `The file ${tab} could not be loaded.`)
-        if (tab === 'history') setHistory(result.data || [])
-        else setBlame(result.data || { lines: [], truncated: false })
-      })
-      .catch((requestError) => {
-        if (alive) setError(requestError?.message || `The file ${tab} could not be loaded.`)
-      })
-      .finally(() => {
-        if (alive) setLoading(false)
-      })
-    return () => {
-      alive = false
-    }
-  }, [tab, history, blame, repoPath, file, refName, retry])
+  // History and blame load separately and keep their results while you switch
+  // tabs. Blame loads the first time its tab opens. Escape is answered by
+  // ModalOverlay.
+  const unwrap = (kind, fallback) => async (promise) => {
+    const result = await promise
+    if (!result?.ok) throw new Error(result?.error || `The file ${kind} could not be loaded.`)
+    return result.data || fallback
+  }
+  const historyResource = useResource(
+    () => unwrap('history', [])(window.api.getFileHistory(repoPath, file, refName || null)),
+    [repoPath, file, refName]
+  )
+  const blameResource = useResource(
+    () => unwrap('blame', { lines: [], truncated: false })(window.api.getFileBlame(repoPath, file, refName || null)),
+    [repoPath, file, refName],
+    { enabled: blameWanted }
+  )
+  const shown = tab === 'history' ? historyResource : blameResource
+  const history = historyResource.data
+  const blame = blameResource.data
 
   const switchTab = (nextTab) => {
     setTab(nextTab)
-    setError(null)
-  }
-  const retryLoad = () => {
-    if (tab === 'history') setHistory(null)
-    else setBlame(null)
-    setRetry((value) => value + 1)
+    if (nextTab === 'blame') setBlameWanted(true)
   }
   const blameLines = blame?.lines || []
 
@@ -90,16 +68,16 @@ export default function FileInspectorPanel({ repoPath, file, refName, onClose, o
           </button>
         </div>
 
-        <div className="file-inspector-body">
-          {loading ? (
+        <div className="file-inspector-body" data-state={shown.status}>
+          {shown.status === 'loading' || shown.status === 'idle' ? (
             <div className="inspector-status" role="status">
               <span className="spinner" aria-hidden="true" /> Loading {tab}…
             </div>
-          ) : error ? (
+          ) : shown.status === 'failed' ? (
             <div className="inspector-status inspector-error" role="alert">
               <strong>Could not load {tab}</strong>
-              <span>{error}</span>
-              <button className="primary-btn" onClick={retryLoad}>Try again</button>
+              <span>{shown.error}</span>
+              <button className="primary-btn" onClick={() => shown.reload()}>Try again</button>
             </div>
           ) : tab === 'history' ? (
             <div className="file-history-list">

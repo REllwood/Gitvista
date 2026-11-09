@@ -193,8 +193,11 @@ src/
     github.js       parseGitHubRemote(url) (precise host match), buildCompareUrl(...)
     slug.js         slugifyBranch(freeText) → valid git branch name
     commitMessage.js Validate and append standard co-author trailers
+    machine.js      defineMachine(): explicit states, accepted events and guarded transitions
+    machines.js     Every state machine in the renderer (operation, surfaces, resources)
     recentRepos.js  Normalise, deduplicate and order the recent-repository list
     helpContext.js  React context to open the Help panel at a term
+  hooks/          useRepository, useMachine, useSurfaces and useResource
   components/      Toolbar, TabBar, Sidebar, GraphView, GraphSvg, CommitDetails, StagingPanel,
                    ActionModal, ConflictPanel, DiffView, DiffModal, ContextMenu, PRModal, CloneModal,
                    SettingsModal, RemoteModal, CompareModal, InteractiveRebaseModal, HistoryPanel,
@@ -223,6 +226,12 @@ build/           App icons (icon.svg + generated icon.icns/ico/png) and mac enti
 - **Conflicts** (`git.cjs` `getConflictState`): detects `.git/MERGE_HEAD`, `rebase-merge`/`rebase-apply`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`. `continueOperation` uses prepared messages and non-interactive editor environment variables so Git never waits on an unavailable terminal.
 - **Credentials** (`git.cjs` top): sets `GIT_TERMINAL_PROMPT=0` and SSH batch mode so remote operations fail fast. Authentication comes from the OS credential helper or SSH agent. GitVista refuses plaintext token storage when no secure Linux helper is configured.
 - **Git environment allowlist** (`git.cjs` `createGit`): simple-git 4 removes every inherited `GIT_*` variable before it runs Git. The hardening variables are passed through by name in `ALLOWED_GIT_ENVIRONMENT`, so any new `GIT_*` setting must be added there or Git will never see it. Always create simple-git instances with `createGit`, never with `simpleGit` directly. An integration test reads the environment a Git hook receives to prove the allowlist works.
+- **State machines** (`lib/machine.js`, `lib/machines.js`): flags that change together are explicit machines. `defineMachine` names each state and the events it accepts, and ignores any event the current state does not accept, so contradictory combinations such as loading and failed at once cannot occur. `lib/machines.js` lists every machine, and a test checks that each one can reach and leave all of its states.
+  - `operationMachine` (`idle`, `running`) says what is running, with a kind such as `commit` or `rebase`, and allows one operation at a time. The app shell, the GitHub panel and Settings each run one.
+  - `surfaceMachine` (`closed`, `open`) holds the dialogs, panels and menus on screen in the order they opened. `useSurfaces().slot(name)` returns a pair shaped like `useState`. `ModalOverlay` also tracks overlays in open order, so the newest one answers Escape and keeps focus.
+  - `resourceMachine` (`idle`, `loading`, `ready`, `failed`) covers data a panel loads. `useResource(load, deps)` keeps only the latest request's answer and gives the panel `status`, `data`, `error` and `reload`. Commit details, compare, file history and blame, the history panel, history search, Settings and the GitHub panel use it.
+  - The running app publishes these states as data attributes: `data-operation`, `data-surface`, `data-repository` and `data-worktree` on `.app`, and `data-state` on each panel that loads data. Tests and automation should read these attributes instead of class names.
+  - When two or more flags describe one thing, such as `loading` alongside `error`, add a machine or use `useResource` instead of another boolean.
 - **IPC security** (`ipc-validation.cjs`): each of the 83 channels has an exact arity and type/path/ref schema. `main.cjs` also rejects calls not originating from the main application frame.
 
 ---
